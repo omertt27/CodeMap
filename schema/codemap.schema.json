@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codemap.dev/schema/codemap-v1.json",
+  "title": "CodeMap Export",
+  "description": "A local-first architecture graph of a code repository, produced by `codemap export`. Stable within schemaVersion major 1.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "generatedAt", "root", "stats", "nodes", "edges", "symbols", "contains"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tool": { "const": "codemap" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "root": { "type": "string", "description": "Absolute path that was scanned." },
+    "stats": {
+      "type": "object",
+      "required": ["files", "edges", "languages", "functions", "classes"],
+      "properties": {
+        "files": { "type": "integer" },
+        "edges": { "type": "integer" },
+        "languages": { "type": "object", "additionalProperties": { "type": "integer" } },
+        "functions": { "type": "integer" },
+        "classes": { "type": "integer" }
+      }
+    },
+    "summary": { "type": "object", "description": "Derived analytics: hubs, connectors, cycles, externals. See src/graph/summary.ts." },
+    "nodes": {
+      "type": "array",
+      "description": "One entry per source file.",
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "name", "dir", "lang", "loc", "imports", "exports", "functions", "classes"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^file:" },
+          "path": { "type": "string" },
+          "name": { "type": "string" },
+          "dir": { "type": "string" },
+          "lang": { "enum": ["python", "javascript", "typescript", "java"] },
+          "loc": { "type": "integer" },
+          "imports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["raw", "resolved", "external", "line"],
+              "properties": {
+                "raw": { "type": "string" },
+                "resolved": { "type": ["string", "null"] },
+                "external": { "type": "boolean" },
+                "line": { "type": "integer" }
+              }
+            }
+          },
+          "exports": { "type": "array", "items": { "type": "string" } },
+          "functions": { "$ref": "#/$defs/symbolList" },
+          "classes": { "$ref": "#/$defs/symbolList" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Directed file→file import dependencies.",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "target", "type", "raw"],
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string", "pattern": "^file:" },
+          "target": { "type": "string", "pattern": "^file:" },
+          "type": { "const": "import" },
+          "raw": { "type": "string" }
+        }
+      }
+    },
+    "symbols": {
+      "type": "array",
+      "description": "Functions and classes promoted to first-class nodes.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind", "file", "path", "lang", "line", "exported"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^sym:" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["function", "class"] },
+          "file": { "type": "string", "pattern": "^file:" },
+          "path": { "type": "string" },
+          "lang": { "enum": ["python", "javascript", "typescript", "java"] },
+          "line": { "type": "integer" },
+          "exported": { "type": "boolean" }
+        }
+      }
+    },
+    "contains": {
+      "type": "array",
+      "description": "File→symbol containment edges.",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "target", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string", "pattern": "^file:" },
+          "target": { "type": "string", "pattern": "^sym:" },
+          "type": { "const": "contains" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "symbolList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "kind", "line", "exported"],
+        "properties": {
+          "name": { "type": "string" },
+          "kind": { "enum": ["function", "class"] },
+          "line": { "type": "integer" },
+          "exported": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

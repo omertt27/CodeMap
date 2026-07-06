@@ -1,0 +1,30 @@
+{
+  "name": "codemap",
+  "version": "0.1.0",
+  "description": "Google Maps for codebases — a local-first architecture map for any repository.",
+  "type": "module",
+  "bin": {
+    "codemap": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "3d-force-graph": "^1.80.0",
+    "commander": "^15.0.0",
+    "cytoscape": "^3.34.0",
+    "ignore": "^7.0.5",
+    "tree-sitter-wasms": "^0.1.13",
+    "web-tree-sitter": "^0.20.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  }
+}

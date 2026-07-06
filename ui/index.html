@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeMap</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <header class="brand">
+        <span class="logo">◈</span>
+        <div>
+          <h1>CodeMap</h1>
+          <p id="root-path" class="muted"></p>
+        </div>
+      </header>
+
+      <div class="search">
+        <input id="search" type="text" placeholder="Search files…" autocomplete="off" />
+        <div id="search-results"></div>
+      </div>
+
+      <section class="stats" id="stats"></section>
+
+      <section class="panel">
+        <h2>Legend</h2>
+        <ul id="legend" class="legend"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Most depended-on</h2>
+        <ul id="hubs" class="ranklist"></ul>
+      </section>
+
+      <section class="panel" id="cycles-panel" hidden>
+        <h2>⚠ Import cycles</h2>
+        <ul id="cycles" class="ranklist"></ul>
+      </section>
+    </aside>
+
+    <main id="canvas-wrap">
+      <div id="cy"></div>
+      <div id="graph3d"></div>
+      <div id="toolbar">
+        <div class="seg" id="view-seg">
+          <button data-view="2d" class="active">2D</button>
+          <button data-view="3d">3D</button>
+        </div>
+        <div class="seg" id="mode-seg">
+          <button data-mode="file" class="active">Files</button>
+          <button data-mode="symbol">Symbols</button>
+        </div>
+        <button id="fit" title="Fit to screen">Fit</button>
+        <button id="relayout" title="Re-run layout">Relayout</button>
+        <label class="toggle"><input type="checkbox" id="labels-toggle" checked /> Labels</label>
+      </div>
+    </main>
+
+    <section id="details" class="hidden">
+      <button id="details-close" aria-label="Close">×</button>
+      <div id="details-body"></div>
+    </section>
+  </div>
+
+  <script src="/vendor/cytoscape.min.js"></script>
+  <script src="/vendor/3d-force-graph.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
