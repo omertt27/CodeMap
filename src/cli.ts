@@ -2,9 +2,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Command } from "commander";
-import { buildGraph } from "./graph/build.js";
+import { buildGraph, projectFileGraph } from "./graph/build.js";
+import { buildCodeGraph } from "./graph/builder.js";
+import { parseRepository } from "./scanner/repository.js";
 import { summarize } from "./graph/summary.js";
-import { loadGraph, saveGraph, graphPath } from "./storage/json.js";
+import { saveCodeGraph } from "./storage/json.js";
 import { buildExport } from "./storage/export.js";
 import { serve } from "./server/serve.js";
 
@@ -17,31 +19,47 @@ program
 
 program
   .command("scan")
-  .description("Scan a repository and write the dependency graph to .codemap/graph.json")
+  .description("Scan a repository, parse files, build the graph, and save it to .codemap/graph.json")
   .argument("[path]", "repository root to scan", ".")
   .option("--json", "print the graph as JSON to stdout instead of a summary")
   .action(async (root: string, opts: { json?: boolean }) => {
     const start = Date.now();
     const failures: { file: string; err: unknown }[] = [];
-    const graph = await buildGraph(root, {
+    const parsed = await parseRepository(root, {
       onProgress: (done, total) => {
         if (!opts.json && (done % 25 === 0 || done === total)) {
-          process.stderr.write(`\r  scanning ${done}/${total} files…`);
+          process.stderr.write(`\r  parsing ${done}/${total} files…`);
         }
       },
       onError: (file, err) => failures.push({ file, err }),
     });
     if (!opts.json) process.stderr.write("\r\x1b[K");
-    const file = saveGraph(root, graph);
+    const graph = buildCodeGraph(parsed.root, parsed.files);
+
     if (opts.json) {
       process.stdout.write(JSON.stringify(graph, null, 2) + "\n");
       return;
     }
+
+    const file = saveCodeGraph(root, graph);
+    const s = graph.stats;
     const ms = Date.now() - start;
-    console.log(`✓ Scanned ${graph.stats.files} files in ${ms}ms`);
-    console.log(`  ${graph.stats.edges} dependency edges, ` +
-      `${graph.stats.functions} functions, ${graph.stats.classes} classes`);
-    console.log(`  Graph written to ${file}`);
+    const pad = (n: number) => String(n).padStart(6);
+
+    console.log(`\n\x1b[1mRepository scanned\x1b[0m  (${ms}ms)\n`);
+    console.log("Languages:");
+    for (const [lang, n] of Object.entries(s.languages).sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${lang}${lang === s.primaryLanguage ? " \x1b[2m(primary)\x1b[0m" : ""} — ${n} files`);
+    }
+    console.log("\nGraph");
+    console.log(`  Files:     ${pad(s.files)}`);
+    console.log(`  Classes:   ${pad(s.classes)}`);
+    console.log(`  Interfaces:${pad(s.interfaces)}`);
+    console.log(`  Enums:     ${pad(s.enums)}`);
+    console.log(`  Functions: ${pad(s.functions)}`);
+    console.log(`  Methods:   ${pad(s.methods)}`);
+    console.log(`  Variables: ${pad(s.variables)}`);
+    console.log(`  Imports:   ${pad(s.imports)}`);
     if (failures.length) {
       console.log(`\n\x1b[33m⚠ ${failures.length} file(s) could not be parsed:\x1b[0m`);
       for (const f of failures.slice(0, 10)) {
@@ -49,7 +67,7 @@ program
       }
       if (failures.length > 10) console.log(`    …and ${failures.length - 10} more`);
     }
-    console.log(`\nRun \x1b[1mcodemap serve ${root === "." ? "" : root}\x1b[0m to explore it.`);
+    console.log(`\nGraph saved to ${file}`);
   });
 
 program
@@ -57,7 +75,7 @@ program
   .description("Print an architecture summary (scans if no graph exists yet)")
   .argument("[path]", "repository root", ".")
   .action(async (root: string) => {
-    const graph = loadGraph(root) ?? (await buildGraph(root));
+    const graph = await buildGraph(root);
     const s = summarize(graph);
     const line = (label: string, val: string | number) =>
       console.log(`  ${label.padEnd(14)} ${val}`);
@@ -105,7 +123,7 @@ program
   .option("--stdout", "write to stdout instead of a file")
   .option("--compact", "minified JSON (default is pretty-printed)")
   .action(async (root: string, opts: { out: string; stdout?: boolean; compact?: boolean }) => {
-    const graph = loadGraph(root) ?? (await buildGraph(root));
+    const graph = await buildGraph(root);
     const doc = buildExport(graph);
     const json = opts.compact ? JSON.stringify(doc) : JSON.stringify(doc, null, 2);
     if (opts.stdout) {
@@ -125,20 +143,15 @@ program
   .description("Open the interactive architecture map in your browser")
   .argument("[path]", "repository root", ".")
   .option("-p, --port <port>", "port to listen on", "4321")
-  .option("--rescan", "re-scan before serving instead of using the cached graph")
   .option("--no-open", "do not open the browser automatically")
-  .action(async (root: string, opts: { port: string; rescan?: boolean; open?: boolean }) => {
-    let graph = opts.rescan ? null : loadGraph(root);
-    if (!graph) {
-      console.log("Scanning repository…");
-      graph = await buildGraph(root);
-      saveGraph(root, graph);
-    } else {
-      console.log(`Loaded cached graph from ${graphPath(root)}`);
-    }
-    const uri = await serve(graph, { port: Number(opts.port), open: opts.open ?? true });
+  .action(async (root: string, opts: { port: string; open?: boolean }) => {
+    console.log("Scanning repository…");
+    const parsed = await parseRepository(root);
+    const codeGraph = buildCodeGraph(parsed.root, parsed.files);
+    const fileGraph = projectFileGraph(parsed);
+    const uri = await serve({ codeGraph, fileGraph }, { port: Number(opts.port), open: opts.open ?? true });
     console.log(`\n  CodeMap is running at \x1b[1m${uri}\x1b[0m`);
-    console.log(`  ${graph.stats.files} files · ${graph.stats.edges} edges · press Ctrl+C to stop\n`);
+    console.log(`  ${fileGraph.stats.files} files · ${fileGraph.stats.edges} edges · press Ctrl+C to stop\n`);
   });
 
 function section(title: string): void {

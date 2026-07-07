@@ -5,8 +5,8 @@ import type { Lang } from "../graph/types.js";
 import { langForExt } from "../languages/registry.js";
 import { toPosix } from "../util/paths.js";
 
-// Directories we never descend into. Kept as a simple set for the MVP; a later
-// version can read .gitignore for full fidelity.
+// Directories we never descend into: VCS metadata plus common generated/build
+// output across ecosystems. `.gitignore` and config `exclude` add to this.
 const IGNORED_DIRS = new Set([
   "node_modules",
   ".git",
@@ -15,6 +15,10 @@ const IGNORED_DIRS = new Set([
   "dist",
   "build",
   "out",
+  "target", // Rust / Java (Maven, sbt)
+  "bin",
+  "obj", // .NET
+  ".gradle",
   ".next",
   ".nuxt",
   "coverage",

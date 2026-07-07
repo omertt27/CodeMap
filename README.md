@@ -74,22 +74,30 @@ store can replace the in-memory JSON one without changing any consumer.
 ## How it works
 
 ```
-repo ──▶ walk ──▶ tree-sitter parse ──▶ resolve imports ──▶ graph ──▶ JSON ──▶ web UI
+repo ─▶ scanner ─▶ language parser ─▶ IR (ParsedFile[]) ─▶ GraphBuilder ─▶ CodeGraph ─▶ graph.json
+        (discover)  (per language)     (language-agnostic)   (language-unaware)
 ```
 
-- **Parsing** uses [tree-sitter](https://tree-sitter.github.io/) via WebAssembly grammars — one engine for all three languages, no native compilation.
-- **Import resolution** maps relative JS/TS specifiers (including the TS/ESM `.js`→`.ts` convention and `index` files) and Python absolute/relative imports to real files. Unresolved specifiers are recorded as external dependencies.
-- **Storage** is a single git-diffable `.codemap/graph.json`. It sits behind a small storage module so SQLite can drop in later without touching the rest of the code.
-- **UI** is served by a zero-dependency Node HTTP server that vendors Cytoscape.js locally — fully offline.
+Parsing and graph construction are fully separated:
 
-## Data model
+- **Scanner** (`scanner/`) discovers source files, respecting `.gitignore`, config `exclude`, and built-in ignores (`node_modules`, `dist`, `build`, `target`, `__pycache__`, `.venv`, …).
+- **Language parsers** (`languages/`) each implement one interface — `initialize` / `canParse` / `parseFile` / `extractSymbols` / `extractRelationships` / `resolveImport` — over [tree-sitter](https://tree-sitter.github.io/) WASM grammars. They emit a language-agnostic **IR** (`ParsedFile`): file metadata (path, language, size, LOC), imports/exports, symbols (class, function, method, interface, enum, variable — with `extends`/`implements` and docstrings), and stored comments.
+- **GraphBuilder** (`graph/builder.ts`) turns the IR into the generic graph. It never asks which language produced the data.
 
-A graph is `{ version, root, generatedAt, stats, nodes, edges }`.
+Nothing outside `languages/` depends on any specific language; adding one is a single new parser.
 
-- **node** (one per file): `id`, `path`, `name`, `dir`, `lang`, `loc`, `imports[]`, `exports[]`, `functions[]`, `classes[]`.
-- **edge** (one per resolved import, file→file): `source`, `target`, `type: "import"`, `raw`.
+## Graph model
 
-See `src/graph/types.ts` for the full, commented model.
+`codemap scan` writes a generic, language-agnostic graph to `.codemap/graph.json`:
+
+```json
+{ "nodes": [...], "edges": [...] }
+```
+
+**Node types:** `Repository`, `Directory`, `File`, `Class`, `Function`, `Method`, `Interface`, `Enum`, `Variable`, `Package`.
+**Edge types:** `CONTAINS` (repo→dir→file, class→method), `DECLARES` (file→symbol), `IMPORTS` (file→file or file→package), `EXPORTS`, `EXTENDS`, `IMPLEMENTS` (`CALLS`/`USES` are reserved for later).
+
+See `src/graph/model.ts` for the full model and `src/languages/ir.ts` for the parser IR. (The interactive UI and query API run on an in-memory file-level projection of the same data — `src/graph/build.ts`.)
 
 ## Project layout
 
@@ -97,19 +105,21 @@ See `src/graph/types.ts` for the full, commented model.
 src/
   cli.ts                 CLI entrypoint (scan / summary / export / serve)
   config.ts              optional .codemap.json (exclude globs, language filter)
-  languages/             language plugins — add a language here, nothing else changes
-    types.ts             LanguagePlugin interface + FileFacts
+  languages/             language parsers — add a language here, nothing else changes
+    parser.ts            LanguageParser interface + TreeSitterParser base class
+    ir.ts                language-agnostic parser output (ParsedFile, ParsedSymbol)
+    ast.ts               shared tree-sitter helpers
     registry.ts          the one place languages are registered
     runtime.ts           shared tree-sitter (WASM) runtime
-    javascript.ts typescript.ts python.ts java.ts jsts.ts
-  scanner/walk.ts        file walk + .gitignore + built-in ignores
-  scanner/parse.ts       filesystem → plugin dispatch → FileNode
-  graph/types.ts         data model
-  graph/build.ts         scan orchestration → Graph
+    jsts.ts python.ts java.ts   the concrete parsers
+  scanner/walk.ts        file discovery + .gitignore + built-in ignores
+  scanner/repository.ts  parse coordinator → ParsedFile[] (IR)
+  graph/model.ts         generic CodeGraph (nodes/edges) — the canonical output
+  graph/builder.ts       language-unaware GraphBuilder: IR → CodeGraph
+  graph/build.ts         in-memory file-level projection (UI / API / export)
   graph/store.ts         GraphStore interface + in-memory JsonGraphStore
   graph/summary.ts       hubs, connectors, cycles (Tarjan SCC), externals
-  graph/symbols.ts       derive first-class function/class nodes
-  storage/json.ts        load/save .codemap/graph.json
+  storage/json.ts        save/load .codemap/graph.json
   storage/export.ts      stable, schema-versioned export document
   server/serve.ts        local UI server + query API
   util/paths.ts          small path helpers
@@ -120,9 +130,12 @@ test/                    node:test suites + golden per-language fixtures
 
 ### Adding a language
 
-Implement a `LanguagePlugin` (extraction + import resolution) and register it in
-`src/languages/registry.ts`. The scanner and graph are language-agnostic — no other
-file needs to change.
+Extend `TreeSitterParser` (or implement `LanguageParser` directly) with the
+language's `extractSymbols` / `extractRelationships` / `resolveImport`, then add an
+instance to `src/languages/registry.ts`. The scanner, graph builder, and CLI are
+language-agnostic — no other file changes. (Go, Rust, PHP, and more grammars are
+available offline; Ruby's prebuilt grammar is currently ABI-incompatible with the
+pinned tree-sitter runtime.)
 
 ## Development
 

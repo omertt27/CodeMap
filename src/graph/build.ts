@@ -1,53 +1,50 @@
 import path from "node:path";
-import { walk } from "../scanner/walk.js";
-import { scanFile } from "../scanner/parse.js";
-import { initLanguages } from "../languages/registry.js";
-import { loadConfig } from "../config.js";
-import type { Edge, FileNode, Graph, GraphStats } from "./types.js";
+import { parseRepository, type ParseOptions, type ParsedRepository } from "../scanner/repository.js";
+import type { ParsedFile } from "../languages/ir.js";
+import type { Edge, FileNode, Graph, GraphStats, SymbolInfo } from "./types.js";
 
-export interface BuildOptions {
-  onProgress?: (done: number, total: number, file: string) => void;
-  /** Called when a file fails to parse, instead of failing the whole scan. */
-  onError?: (file: string, err: unknown) => void;
+export type BuildOptions = ParseOptions;
+
+/**
+ * The file-level dependency graph: one node per file, one edge per resolved
+ * import, with top-level functions/classes as node metadata. A projection of the
+ * parser IR consumed by the query API, sidebar detail, and export. (The richer
+ * generic graph lives in `builder.ts`; the map view in `mapView.ts`.)
+ */
+export async function buildGraph(root: string, opts: BuildOptions = {}): Promise<Graph> {
+  return projectFileGraph(await parseRepository(root, opts));
 }
 
-/** Scan `root` and produce a full dependency graph. */
-export async function buildGraph(root: string, opts: BuildOptions = {}): Promise<Graph> {
-  const absRoot = path.resolve(root);
-  await initLanguages();
-
-  const config = loadConfig(absRoot);
-  const files = walk(absRoot, { exclude: config.exclude, languages: config.languages });
-  const fileSet = new Set(files.map((f) => f.rel));
-  const nodes: FileNode[] = [];
-
-  let done = 0;
-  for (const f of files) {
-    try {
-      nodes.push(scanFile(f.abs, f.rel, fileSet));
-    } catch (err) {
-      opts.onError?.(f.rel, err);
-      // Keep the file in the graph as an empty node so it still appears.
-      nodes.push({
-        id: `file:${f.rel}`, path: f.rel, name: path.posix.basename(f.rel),
-        dir: path.posix.dirname(f.rel) === "." ? "" : path.posix.dirname(f.rel),
-        lang: f.lang, loc: 0, imports: [], exports: [], functions: [], classes: [],
-      });
-    }
-    done++;
-    opts.onProgress?.(done, files.length, f.rel);
-  }
-
+/** Project already-parsed IR into the file-level graph (no re-parsing). */
+export function projectFileGraph(parsed: ParsedRepository): Graph {
+  const nodes: FileNode[] = parsed.files.map(projectFile);
   const edges = buildEdges(nodes);
   const stats = computeStats(nodes, edges);
-
   return {
     version: 1,
-    root: absRoot,
+    root: parsed.root,
     generatedAt: new Date().toISOString(),
     stats,
     nodes,
     edges,
+  };
+}
+
+function projectFile(f: ParsedFile): FileNode {
+  const info = (s: ParsedFile["symbols"][number]): SymbolInfo => ({
+    name: s.name, kind: s.kind as "function" | "class", line: s.line, exported: s.exported,
+  });
+  return {
+    id: `file:${f.path}`,
+    path: f.path,
+    name: path.posix.basename(f.path),
+    dir: path.posix.dirname(f.path) === "." ? "" : path.posix.dirname(f.path),
+    lang: f.language,
+    loc: f.loc,
+    imports: f.imports,
+    exports: f.exports,
+    functions: f.symbols.filter((s) => s.kind === "function" && !s.parent).map(info),
+    classes: f.symbols.filter((s) => s.kind === "class" && !s.parent).map(info),
   };
 }
 

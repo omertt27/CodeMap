@@ -4,26 +4,33 @@
   "description": "Google Maps for codebases — a local-first architecture map for any repository.",
   "type": "module",
   "bin": {
-    "codemap": "dist/cli.js"
+    "codemap": "dist/cli.js",
+    "repo-map": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-ui.mjs",
+    "build:ui": "node scripts/build-ui.mjs",
     "dev": "tsx src/cli.ts",
+    "dev:ui": "node scripts/build-ui.mjs --watch",
     "start": "node dist/cli.js",
     "test": "node --import tsx --test \"test/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.ui.json"
   },
   "license": "MIT",
   "dependencies": {
     "3d-force-graph": "^1.80.0",
     "commander": "^15.0.0",
     "cytoscape": "^3.34.0",
+    "graphology": "^0.26.0",
+    "graphology-layout-forceatlas2": "^0.10.1",
     "ignore": "^7.0.5",
+    "sigma": "^3.0.3",
     "tree-sitter-wasms": "^0.1.13",
     "web-tree-sitter": "^0.20.8"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
+    "esbuild": "^0.28.1",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3"
   }

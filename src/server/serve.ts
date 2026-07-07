@@ -2,14 +2,15 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import type { Graph } from "../graph/types.js";
+import type { CodeGraph } from "../graph/model.js";
+import { toMapGraph } from "../graph/mapView.js";
 import { JsonGraphStore, type Direction, type GraphStore } from "../graph/store.js";
 
-const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
-// dist/server/serve.js -> repo root -> ui/
-const UI_DIR = path.join(here, "..", "..", "ui");
+// dist/server/serve.js -> repo root
+const ROOT = path.join(here, "..", "..");
+const UI_DIR = path.join(ROOT, "ui");
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -18,38 +19,30 @@ const CONTENT_TYPES: Record<string, string> = {
   ".json": "application/json; charset=utf-8",
 };
 
+export interface ServeData {
+  /** Generic graph → the interactive map (compact map view is served). */
+  codeGraph: CodeGraph;
+  /** File-level graph → sidebar detail + query API. */
+  fileGraph: Graph;
+}
+
 export interface ServeOptions {
   port: number;
   open?: boolean;
 }
 
-export function serve(graph: Graph, opts: ServeOptions): Promise<string> {
-  const store: GraphStore = new JsonGraphStore(graph);
-  // The current UI still consumes whole-graph blobs; these are precomputed once.
-  const graphJson = JSON.stringify(store.raw());
-  const summaryJson = JSON.stringify(store.summary());
-  const symbolsJson = JSON.stringify(store.symbols());
-  const cytoscapePath = require.resolve("cytoscape/dist/cytoscape.min.js");
-  // 3d-force-graph's "exports" map blocks subpath/package.json resolution, so
-  // locate the UMD bundle next to its resolved main entry (both live in dist/).
-  const forceGraph3dPath = path.join(
-    path.dirname(require.resolve("3d-force-graph")),
-    "3d-force-graph.min.js",
-  );
+export function serve(data: ServeData, opts: ServeOptions): Promise<string> {
+  const store: GraphStore = new JsonGraphStore(data.fileGraph);
+  const mapJson = JSON.stringify(toMapGraph(data.codeGraph));
 
   const server = http.createServer((req, res) => {
     const parsed = new URL(req.url ?? "/", "http://localhost");
     const url = parsed.pathname;
     try {
       if (url === "/" || url === "/index.html") return sendFile(res, path.join(UI_DIR, "index.html"));
-      if (url === "/app.js") return sendFile(res, path.join(UI_DIR, "app.js"));
+      if (url === "/app.js") return sendFile(res, path.join(UI_DIR, "dist", "app.js"));
       if (url === "/style.css") return sendFile(res, path.join(UI_DIR, "style.css"));
-      if (url === "/vendor/cytoscape.min.js") return sendFile(res, cytoscapePath);
-      if (url === "/vendor/3d-force-graph.min.js") return sendFile(res, forceGraph3dPath);
-      if (url === "/graph.json") return sendJson(res, graphJson);
-      if (url === "/summary.json") return sendJson(res, summaryJson);
-      if (url === "/symbols.json") return sendJson(res, symbolsJson);
-      // Query-oriented API (backed by GraphStore) for windowed clients / agents.
+      if (url === "/graph.json") return sendJson(res, mapJson);
       if (url.startsWith("/api/")) return handleApi(res, url, parsed.searchParams, store);
     } catch {
       res.writeHead(500).end("Internal error");
@@ -69,7 +62,7 @@ export function serve(graph: Graph, opts: ServeOptions): Promise<string> {
   });
 }
 
-/** Query-oriented API over the GraphStore. All routes return JSON. */
+/** Query-oriented API over the file graph. Powers lazy sidebar detail + agents. */
 function handleApi(res: http.ServerResponse, url: string, q: URLSearchParams, store: GraphStore): void {
   const num = (v: string | null, d: number) => (v != null && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : d);
   switch (url) {
@@ -110,8 +103,7 @@ function sendJson(res: http.ServerResponse, json: string): void {
 }
 
 function openBrowser(uri: string): void {
-  const cmd =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+  const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
   import("node:child_process").then(({ spawn }) => {
     try {
       spawn(cmd, [uri], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref();

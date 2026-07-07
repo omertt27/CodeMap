@@ -67,7 +67,9 @@ test("java-basic: fully-qualified import resolves to the class file", async () =
   assert.deepEqual(edgePairs(g), ["com/example/app/Server.java->com/example/lib/Helper.java"]);
   const server = node(g, "com/example/app/Server.java");
   assert.deepEqual(names(server.classes), ["Server"]);
-  assert.deepEqual(names(server.functions), ["calc", "start"]); // methods → functions
+  // In the legacy file-graph, methods are not file-level functions (they belong
+  // to a class — see the generic CodeGraph for Method nodes).
+  assert.deepEqual(names(server.functions), []);
   // java.util.List is not in the repo → external.
   const listImp = server.imports.find((i) => i.raw === "java.util.List")!;
   assert.equal(listImp.external, true);
