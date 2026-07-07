@@ -6,23 +6,51 @@ Supports **Python, JavaScript, TypeScript, and Java** today, via a small languag
 
 ---
 
-## Quick start
+## Requirements
+
+- **Node.js ≥ 22** (uses `node:sqlite`, WASM, worker threads). Check with `node -v`.
+- **git** — only needed for the history/time-machine features.
+- No other system dependencies: tree-sitter runs as WebAssembly, so nothing to compile.
+
+## Setup
 
 ```bash
-npm install
-npm run build
-
-# Scan a repo and write .codemap/graph.json
-node dist/cli.js scan /path/to/repo
-
-# Explore it in your browser (pan / zoom / search / click)
-node dist/cli.js serve /path/to/repo
-
-# Print a text architecture summary
-node dist/cli.js summary /path/to/repo
+git clone <this-repo> codemap && cd codemap
+npm install            # installs deps and builds automatically (via prepare)
 ```
 
-During development you can skip the build step with `npm run dev -- <command>` (runs the TypeScript directly via `tsx`).
+Then run it one of three ways:
+
+```bash
+# 1) directly
+node dist/cli.js serve /path/to/your/repo
+
+# 2) as a global command (adds `codemap` and `repo-map` to your PATH)
+npm link
+codemap serve /path/to/your/repo
+
+# 3) without linking
+npx codemap serve /path/to/your/repo
+```
+
+## Everyday use
+
+```bash
+codemap serve /path/to/repo     # open the interactive map in your browser (start here)
+codemap scan /path/to/repo      # write .codemap/graph.json + architecture-summary.json
+codemap insights /path/to/repo  # cycles, hotspots, God modules, unused, layer violations
+codemap impact src/auth.ts      # "what breaks if I change this?" (blast radius)
+codemap history /path/to/repo   # churn, stability, evolution insights (needs git)
+codemap diff HEAD~30 HEAD       # architecture diff between two revisions
+codemap export /path/to/repo    # stable JSON for other tools / AI agents
+codemap mcp /path/to/repo       # run as an MCP server for AI agents (stdio)
+```
+
+Everything CodeMap writes goes in a `.codemap/` folder inside the scanned repo
+(graph, caches, reports) — add it to your `.gitignore`. Nothing leaves your machine.
+
+During development you can skip the build with `npm run dev -- <command>` (runs the
+TypeScript directly via `tsx`).
 
 ## Commands
 
@@ -176,6 +204,18 @@ the architecture changed over time.
 - **History panel** — a timeline slider scrubs revisions and the map morphs (shared nodes keep their positions, new ones seed near their neighbours), a Replay button plays through history, plus a diff view.
 
 Endpoints: `/api/history`, `/api/timeline`, `/api/snapshot?rev=`, `/api/diff?a=&b=`.
+
+## Scaling to large codebases
+
+CodeMap is built to handle company-scale monorepos:
+
+- **Incremental parse cache** — files are content-hashed; a re-scan only re-parses what changed (`scan` reports `N cached, M parsed`). Warm scans are ~4× faster.
+- **Worker-pool parsing** — parsing fans out across CPU cores once a repo is large (~2.7× on a 600-file tree; auto above `CODEMAP_WORKER_THRESHOLD`, default 400). Output is byte-identical to the single-threaded path.
+- **SQLite store** — `SqliteGraphStore` (`src/graph/sqliteStore.ts`, built on `node:sqlite`) implements the same `GraphStore` interface as the in-memory one, with SQL search and a recursive-CTE dependency BFS, so the whole graph needn't live in RAM.
+- **Analysis cache** — PageRank/cycles/hotspots are cached by a structural hash; unchanged trees skip the recompute.
+- **Monorepo awareness** — detects npm/yarn/pnpm workspaces, maps files to packages, and rolls up per-package files/LOC/cross-package deps (`/api/packages`). The map's folder view groups by **package boundary** when present.
+- **Semantic zoom / drill-down** — the map collapses to one node per folder/package (▣ toolbar) and **double-clicking a folder drills into its files**; very large repos start in this view to stay responsive.
+- **Git at scale** — historical snapshots read all blobs via a single `git cat-file --batch` process instead of one `git show` per file.
 
 ## MCP server (for AI agents)
 

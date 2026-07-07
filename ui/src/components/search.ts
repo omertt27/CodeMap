@@ -13,15 +13,22 @@ export class Search {
     private model: GraphModel,
     private camera: CameraControls,
   ) {
-    this.input.addEventListener("input", () => this.onInput());
+    this.input.addEventListener("input", () => { this.active = 0; this.onInput(); });
     this.input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        const first = this.results.querySelector<HTMLElement>("[data-goto]");
-        if (first) this.go(first.getAttribute("data-goto")!);
-      } else if (e.key === "Escape") {
-        this.clear();
-      }
+      const items = [...this.results.querySelectorAll<HTMLElement>("[data-goto]")];
+      if (e.key === "ArrowDown") { e.preventDefault(); this.move(1, items); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); this.move(-1, items); }
+      else if (e.key === "Enter") { const el = items[this.active] ?? items[0]; if (el) this.go(el.getAttribute("data-goto")!); }
+      else if (e.key === "Escape") this.clear();
     });
+  }
+
+  private active = 0;
+  private move(delta: number, items: HTMLElement[]): void {
+    if (!items.length) return;
+    this.active = (this.active + delta + items.length) % items.length;
+    items.forEach((el, i) => el.classList.toggle("active", i === this.active));
+    items[this.active].scrollIntoView({ block: "nearest" });
   }
 
   private onInput(): void {

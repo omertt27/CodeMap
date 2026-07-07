@@ -3,18 +3,30 @@
   "version": "0.1.0",
   "description": "Google Maps for codebases — a local-first architecture map for any repository.",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "codemap": "dist/cli.js",
     "repo-map": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "ui/index.html",
+    "ui/style.css",
+    "ui/dist",
+    "schema"
+  ],
   "scripts": {
     "build": "tsc && node scripts/build-ui.mjs",
+    "prepare": "npm run build",
     "build:ui": "node scripts/build-ui.mjs",
     "dev": "tsx src/cli.ts",
     "dev:ui": "node scripts/build-ui.mjs --watch",
     "start": "node dist/cli.js",
     "test": "node --import tsx --test \"test/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.ui.json"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.ui.json",
+    "verify:ui": "node scripts/verify-ui.mjs"
   },
   "license": "MIT",
   "dependencies": {
@@ -33,6 +45,7 @@
   "devDependencies": {
     "@types/node": "^26.1.0",
     "esbuild": "^0.28.1",
+    "puppeteer-core": "^25.3.0",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3"
   }

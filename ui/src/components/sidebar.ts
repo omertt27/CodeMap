@@ -142,17 +142,24 @@ export class Sidebar {
   }
 
   private metricsBlock(m: NodeMetricsData): string {
-    const rows: [string, string | number][] = [
-      ["Direct imports", m.directImports],
-      ["Direct dependents", m.directDependents],
-      ["Transitive imports", m.transitiveImports],
-      ["Transitive dependents", m.transitiveDependents],
+    const maxDeg = Math.max(1, this.model.maxDegree);
+    // rows that get a mini bar (value, max, colour)
+    const bars: [string, number, number, string][] = [
+      ["Direct dependents", m.directDependents, maxDeg, "#5aa2ff"],
+      ["Transitive dependents", m.transitiveDependents, this.model.nodes.length, "#5aa2ff"],
+      ["Direct imports", m.directImports, maxDeg, "#7ee787"],
+      ["Hotspot score", m.hotspotScore, 100, "#f0883e"],
+    ];
+    const plain: [string, string | number][] = [
       ["In / out degree", `${m.inDegree} / ${m.outDegree}`],
       ["Dependency depth", m.depth],
       ["Centrality", m.centrality.toFixed(4)],
     ];
     return `<div class="detail-block"><h3>Dependency analysis</h3>${
-      rows.map(([k, v]) => `<div class="stat-row"><span>${k}</span><span class="mono">${v}</span></div>`).join("")
+      bars.map(([k, v, mx, c]) => `<div class="metric"><div class="metric-top"><span>${k}</span><span class="mono">${v}</span></div>
+        <div class="bar"><span style="width:${Math.min(100, (v / mx) * 100)}%;background:${c}"></span></div></div>`).join("")
+    }${
+      plain.map(([k, v]) => `<div class="stat-row"><span>${k}</span><span class="mono">${v}</span></div>`).join("")
     }</div>`;
   }
 

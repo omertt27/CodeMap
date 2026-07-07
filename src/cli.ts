@@ -9,7 +9,7 @@ import { summarize } from "./graph/summary.js";
 import { saveCodeGraph } from "./storage/json.js";
 import { buildExport } from "./storage/export.js";
 import { serve } from "./server/serve.js";
-import { analyzeRepo } from "./analysis/index.js";
+import { analyzeRepoCached } from "./analysis/cache.js";
 import type { Analysis } from "./analysis/index.js";
 import { analyzeImpact } from "./impact/index.js";
 import type { ImpactReport } from "./impact/index.js";
@@ -33,6 +33,7 @@ program
     const start = Date.now();
     const failures: { file: string; err: unknown }[] = [];
     const parsed = await parseRepository(root, {
+      cache: true,
       onProgress: (done, total) => {
         if (!opts.json && (done % 25 === 0 || done === total)) {
           process.stderr.write(`\r  parsing ${done}/${total} files…`);
@@ -50,7 +51,7 @@ program
 
     // Deterministic architecture analysis (parser → builder → analyzer).
     const fileGraph = projectFileGraph(parsed);
-    const analysis = analyzeRepo(fileGraph, root);
+    const analysis = analyzeRepoCached(fileGraph, root);
     const summaryFile = saveArchitectureSummary(root, analysis);
 
     const file = saveCodeGraph(root, graph);
@@ -58,7 +59,9 @@ program
     const ms = Date.now() - start;
     const pad = (n: number) => String(n).padStart(6);
 
-    console.log(`\n\x1b[1mRepository scanned\x1b[0m  (${ms}ms)\n`);
+    const cs = parsed.cacheStats;
+    const cacheNote = cs ? `  \x1b[2m(${cs.hits} cached, ${cs.misses} parsed)\x1b[0m` : "";
+    console.log(`\n\x1b[1mRepository scanned\x1b[0m  (${ms}ms)${cacheNote}\n`);
     console.log("Languages:");
     for (const [lang, n] of Object.entries(s.languages).sort((a, b) => b[1] - a[1])) {
       console.log(`  ${lang}${lang === s.primaryLanguage ? " \x1b[2m(primary)\x1b[0m" : ""} — ${n} files`);
@@ -92,7 +95,7 @@ program
   .description("Print an architecture summary (scans if no graph exists yet)")
   .argument("[path]", "repository root", ".")
   .action(async (root: string) => {
-    const graph = await buildGraph(root);
+    const graph = await buildGraph(root, { cache: true });
     const s = summarize(graph);
     const line = (label: string, val: string | number) =>
       console.log(`  ${label.padEnd(14)} ${val}`);
@@ -140,7 +143,7 @@ program
   .option("--stdout", "write to stdout instead of a file")
   .option("--compact", "minified JSON (default is pretty-printed)")
   .action(async (root: string, opts: { out: string; stdout?: boolean; compact?: boolean }) => {
-    const graph = await buildGraph(root);
+    const graph = await buildGraph(root, { cache: true });
     const doc = buildExport(graph);
     const json = opts.compact ? JSON.stringify(doc) : JSON.stringify(doc, null, 2);
     if (opts.stdout) {
@@ -160,8 +163,8 @@ program
   .description("Print deterministic architecture insights (cycles, hotspots, God modules, unused, layer violations)")
   .argument("[path]", "repository root", ".")
   .action(async (root: string) => {
-    const graph = await buildGraph(root);
-    const a = analyzeRepo(graph, root);
+    const graph = await buildGraph(root, { cache: true });
+    const a = analyzeRepoCached(graph, root);
     printArchitectureSummary(a);
 
     section("Circular dependencies");
@@ -196,7 +199,7 @@ program
   .option("--root <path>", "repository root", ".")
   .option("--json", "print the report as JSON to stdout")
   .action(async (fileArg: string, opts: { root: string; json?: boolean }) => {
-    const graph = await buildGraph(opts.root);
+    const graph = await buildGraph(opts.root, { cache: true });
     const report = analyzeImpact(graph, fileArg);
     if (!report) {
       console.error(`No file matching "${fileArg}" in ${path.resolve(opts.root)}`);
@@ -278,10 +281,10 @@ program
   .option("--no-open", "do not open the browser automatically")
   .action(async (root: string, opts: { port: string; open?: boolean }) => {
     console.log("Scanning repository…");
-    const parsed = await parseRepository(root);
+    const parsed = await parseRepository(root, { cache: true });
     const codeGraph = buildCodeGraph(parsed.root, parsed.files);
     const fileGraph = projectFileGraph(parsed);
-    const analysis = analyzeRepo(fileGraph, root);
+    const analysis = analyzeRepoCached(fileGraph, root);
     const history = isGitRepo(root) ? await buildHistory(root, { evolutionGraphs: true }) : null;
     const uri = await serve({ codeGraph, fileGraph, analysis, root, history }, { port: Number(opts.port), open: opts.open ?? true });
     console.log(`\n  CodeMap is running at \x1b[1m${uri}\x1b[0m`);

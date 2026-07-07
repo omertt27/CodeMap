@@ -1,5 +1,5 @@
 import path from "node:path";
-import { listTree, showFile } from "./git.js";
+import { listTree, readBlobs } from "./git.js";
 import { initParsers, parserForFile } from "../languages/registry.js";
 import { collectComments } from "../languages/ast.js";
 import type { ParsedRepository } from "../scanner/repository.js";
@@ -16,14 +16,13 @@ export async function parseRevision(root: string, rev: string): Promise<ParsedRe
   const fileSet = new Set(supported);
   const files: ParsedFile[] = [];
 
+  // One batched read for the whole revision instead of a git process per file.
+  const blobs = readBlobs(absRoot, rev, supported);
+
   for (const rel of supported) {
     const parser = parserForFile(rel)!;
-    let src: string;
-    try {
-      src = showFile(absRoot, rev, rel);
-    } catch {
-      continue; // unreadable blob (submodule, symlink, …)
-    }
+    const src = blobs.get(rel);
+    if (src === undefined) continue; // unreadable blob (submodule, symlink, …)
     try {
       const tree = parser.parseFile(src, path.extname(rel));
       const symbols = parser.extractSymbols(tree);

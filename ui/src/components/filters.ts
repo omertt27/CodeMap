@@ -15,15 +15,17 @@ export class Filters {
   }
 
   private template(): string {
+    const langCount = (l: string) => this.model.nodes.filter((n) => n.language === l).length;
+    const typeCount = (t: string) => this.model.nodes.filter((n) => n.type === t).length;
     const langs = this.model.languages
       .map(
         (l) => `<label class="chk"><input type="checkbox" data-lang="${l}" checked>
-          <span class="dot" style="background:${LANG_COLOR[l] ?? "#888"}"></span>${l}</label>`,
+          <span class="dot" style="background:${LANG_COLOR[l] ?? "#888"}"></span>${l}<span class="cnt">${langCount(l)}</span></label>`,
       )
       .join("");
     const types = NODE_TYPES.map(
       (t) => `<label class="chk"><input type="checkbox" data-type="${t}" checked>
-        <span class="dot" style="background:${(TYPE_COLOR as Record<string, string>)[t] ?? "#888"}"></span>${t}</label>`,
+        <span class="dot" style="background:${(TYPE_COLOR as Record<string, string>)[t] ?? "#888"}"></span>${t}<span class="cnt">${typeCount(t)}</span></label>`,
     ).join("");
     const dirs = ["<option value=\"\">All directories</option>"]
       .concat(this.model.directories.map((d) => `<option value="${d}">${d}</option>`))

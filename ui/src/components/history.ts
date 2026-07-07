@@ -42,7 +42,16 @@ export class History {
       <div class="hist-group">
         <h4>Timeline <span class="rev-label" id="rev-label">current</span></h4>
         <input type="range" id="time-slider" min="0" max="${this.timeline.length}" value="${this.timeline.length}" step="1">
-        <div class="time-controls"><button id="play">▶ Replay</button><button id="to-current">Current</button></div>
+        <div class="time-controls">
+          <button id="play">▶ Replay</button>
+          <select id="replay-speed" title="Replay speed">
+            <option value="1800">0.5×</option>
+            <option value="900" selected>1×</option>
+            <option value="450">2×</option>
+            <option value="220">4×</option>
+          </select>
+          <button id="to-current">Current</button>
+        </div>
         <div id="commit-meta" class="commit-meta"></div>
       </div>
 
@@ -77,6 +86,7 @@ export class History {
     const slider = $<HTMLInputElement>("time-slider");
     slider.addEventListener("input", () => this.scrubTo(Number(slider.value)));
     $("play").addEventListener("click", () => this.togglePlay(slider));
+    $("replay-speed").addEventListener("change", () => { if (this.playTimer !== null) this.schedulePlay(slider); });
     $("to-current").addEventListener("click", () => { slider.value = String(this.timeline.length); this.scrubTo(this.timeline.length); });
 
     const a = $<HTMLSelectElement>("diff-a");
@@ -108,17 +118,37 @@ export class History {
     setTimeout(() => this.minimap.redraw(), 60);
   }
 
+  private playIndex = 0;
+
+  private speedMs(): number {
+    return Number(this.el.querySelector<HTMLSelectElement>("#replay-speed")?.value) || 900;
+  }
+
   private togglePlay(slider: HTMLInputElement): void {
-    if (this.playTimer !== null) { clearInterval(this.playTimer); this.playTimer = null; return; }
-    let i = 0;
+    if (this.playTimer !== null) { this.stopPlay(); return; }
+    this.playIndex = 0;
     slider.value = "0";
     this.scrubTo(0);
+    const btn = this.el.querySelector("#play");
+    if (btn) btn.textContent = "⏸ Pause";
+    this.schedulePlay(slider);
+  }
+
+  /** (Re)arm the replay interval at the current speed — called on speed change too. */
+  private schedulePlay(slider: HTMLInputElement): void {
+    if (this.playTimer !== null) clearInterval(this.playTimer);
     this.playTimer = window.setInterval(() => {
-      i++;
-      if (i > this.timeline.length) { clearInterval(this.playTimer!); this.playTimer = null; return; }
-      slider.value = String(i);
-      this.scrubTo(i);
-    }, 900);
+      this.playIndex++;
+      if (this.playIndex > this.timeline.length) { this.stopPlay(); return; }
+      slider.value = String(this.playIndex);
+      this.scrubTo(this.playIndex);
+    }, this.speedMs());
+  }
+
+  private stopPlay(): void {
+    if (this.playTimer !== null) { clearInterval(this.playTimer); this.playTimer = null; }
+    const btn = this.el.querySelector("#play");
+    if (btn) btn.textContent = "▶ Replay";
   }
 
   private async runDiff(a: string, b: string): Promise<void> {

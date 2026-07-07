@@ -2,9 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { walk } from "./walk.js";
 import { initParsers, parserForFile } from "../languages/registry.js";
-import { collectComments } from "../languages/ast.js";
+import { extractFacts } from "../languages/extract.js";
 import { loadConfig } from "../config.js";
+import { ParseCache, importsFromCache, type CachedFacts } from "./cache.js";
+import { parseTexts, poolAvailable } from "./pool.js";
+import type { ParseTask } from "./parseWorker.js";
+import type { ImportRef, Lang } from "../graph/types.js";
 import type { ParsedFile } from "../languages/ir.js";
+
+// Parse files across worker threads once a repo is large enough to benefit
+// (overridable via CODEMAP_WORKER_THRESHOLD). Below this, the single-threaded
+// path avoids the worker startup cost.
+const WORKER_THRESHOLD = Number(process.env.CODEMAP_WORKER_THRESHOLD || 400);
 
 // Orchestrates parsing: discover files (scanner) → dispatch to the right parser
 // → produce the language-agnostic IR. Knows nothing about any specific language
@@ -13,11 +22,17 @@ import type { ParsedFile } from "../languages/ir.js";
 export interface ParseOptions {
   onProgress?: (done: number, total: number, file: string) => void;
   onError?: (file: string, err: unknown) => void;
+  /** Use the incremental parse cache under .codemap/ (opt-in; off in tests). */
+  cache?: boolean;
+  /** Force worker-pool parsing on/off (default: auto by repo size). */
+  workers?: boolean;
 }
 
 export interface ParsedRepository {
   root: string; // absolute path scanned
   files: ParsedFile[];
+  /** Cache hit/miss counts when caching is enabled. */
+  cacheStats?: { hits: number; misses: number };
 }
 
 export async function parseRepository(root: string, opts: ParseOptions = {}): Promise<ParsedRepository> {
@@ -27,42 +42,75 @@ export async function parseRepository(root: string, opts: ParseOptions = {}): Pr
   const config = loadConfig(absRoot);
   const discovered = walk(absRoot, { exclude: config.exclude, languages: config.languages });
   const fileSet = new Set(discovered.map((d) => d.rel));
-  const files: ParsedFile[] = [];
+  const cache = opts.cache ? new ParseCache(absRoot) : null;
 
-  let done = 0;
+  // Phase 1 (main thread I/O): read + hash each file, take cache hits, and
+  // collect the cache misses' source text to parse.
+  interface Slot { rel: string; lang: Lang; hash: string; facts: CachedFacts | null; noParser?: boolean }
+  const slots: Slot[] = [];
+  const misses: ParseTask[] = [];
   for (const f of discovered) {
-    const parser = parserForFile(f.abs);
-    try {
-      if (!parser) throw new Error("no parser for file");
-      const buf = fs.readFileSync(f.abs);
-      const text = buf.toString("utf8");
-      const ext = path.extname(f.abs);
-      const tree = parser.parseFile(text, ext);
-      const symbols = parser.extractSymbols(tree);
-      const { imports, exports } = parser.extractRelationships(tree);
-      for (const imp of imports) {
-        imp.resolved = parser.resolveImport(imp.raw, f.rel, fileSet);
-        imp.external = imp.resolved === null;
-      }
-      files.push({
-        path: f.rel,
-        language: f.lang,
-        size: buf.length,
-        loc: text ? text.split(/\r\n|\r|\n/).length : 0,
-        imports,
-        exports,
-        symbols,
-        comments: collectComments(tree),
-      });
-    } catch (err) {
-      opts.onError?.(f.rel, err);
-      files.push({ path: f.rel, language: f.lang, size: 0, loc: 0, imports: [], exports: [], symbols: [], comments: [] });
+    if (!parserForFile(f.abs)) { slots.push({ rel: f.rel, lang: f.lang, hash: "", facts: null, noParser: true }); continue; }
+    const buf = fs.readFileSync(f.abs);
+    const hash = cache ? cache.hash(buf) : "";
+    const cached = cache ? cache.get(f.rel, hash) : null;
+    if (cached) {
+      slots.push({ rel: f.rel, lang: f.lang, hash, facts: cached });
+    } else {
+      slots.push({ rel: f.rel, lang: f.lang, hash, facts: null });
+      misses.push({ rel: f.rel, ext: path.extname(f.abs), text: buf.toString("utf8"), size: buf.length });
     }
-    done++;
-    opts.onProgress?.(done, discovered.length, f.rel);
   }
 
-  return { root: absRoot, files };
+  // Phase 2 (CPU): parse misses — across worker threads when large enough.
+  const parsedMiss = new Map<string, CachedFacts>();
+  if (misses.length) {
+    const useWorkers = opts.workers ?? (misses.length >= WORKER_THRESHOLD && poolAvailable());
+    if (useWorkers && poolAvailable()) {
+      const results = await parseTexts(misses);
+      for (const t of misses) {
+        const r = results.get(t.rel);
+        if (r?.facts) parsedMiss.set(t.rel, r.facts);
+        else opts.onError?.(t.rel, new Error(r?.error ?? "parse failed"));
+      }
+    } else {
+      for (const t of misses) {
+        try {
+          parsedMiss.set(t.rel, extractFacts(parserForFile("f" + t.ext)!, t.text, t.ext, t.size));
+        } catch (err) {
+          opts.onError?.(t.rel, err);
+        }
+      }
+    }
+  }
+
+  // Phase 3: assemble in order, update cache, and resolve imports.
+  const files: ParsedFile[] = [];
+  let done = 0;
+  for (const s of slots) {
+    const facts = s.facts ?? parsedMiss.get(s.rel) ?? null;
+    if (s.noParser || !facts) {
+      if (!s.noParser && !facts) opts.onError?.(s.rel, new Error("parse failed"));
+      files.push({ path: s.rel, language: s.lang, size: 0, loc: 0, imports: [], exports: [], symbols: [], comments: [] });
+    } else {
+      if (cache && !s.facts) cache.set(s.rel, s.hash, facts);
+      const parser = parserForFile("f" + path.extname(s.rel))!;
+      const imports: ImportRef[] = importsFromCache(facts.imports);
+      for (const imp of imports) {
+        imp.resolved = parser.resolveImport(imp.raw, s.rel, fileSet);
+        imp.external = imp.resolved === null;
+      }
+      files.push({ path: s.rel, language: s.lang, size: facts.size, loc: facts.loc, imports, exports: facts.exports, symbols: facts.symbols, comments: facts.comments });
+    }
+    opts.onProgress?.(++done, slots.length, s.rel);
+  }
+
+  if (cache) {
+    cache.prune(fileSet);
+    cache.save();
+  }
+
+  return { root: absRoot, files, cacheStats: cache ? { hits: cache.hits, misses: cache.misses } : undefined };
 }
 
 /** The dominant language by file count, or null for an empty repo. */

@@ -3,28 +3,28 @@ import type { MapNode } from "../model/types.js";
 // All visual constants in one place so the look is consistent and easy to retheme.
 
 export const LANG_COLOR: Record<string, string> = {
-  python: "#3776ab",
+  python: "#4b9fea",
   javascript: "#e8c020",
   typescript: "#3178c6",
-  java: "#b07219",
+  java: "#e8734a",
 };
 
 export const TYPE_COLOR = {
-  Directory: "#6e7681",
-  Package: "#8957e5",
-  File: "#58a6ff",
+  Directory: "#454d5a",
+  Package: "#a371f7",
+  File: "#5aa2ff",
 };
 
-export const DIM = "#2b3138";
+export const DIM = "#262c34";
 export const HIGHLIGHT = "#f0f6fc";
-export const EDGE_IMPORT = "#3a4552";
-export const EDGE_CONTAINS = "#23292f";
+export const EDGE_IMPORT = "#39424e";
+export const EDGE_CONTAINS = "#1c2129";
+export const LABEL_COLOR = "#c9d1d9";
 
-/** A single glyph used as a lightweight type "icon" prefixed on labels. */
-export function glyph(node: MapNode): string {
-  if (node.type === "Directory") return "\u{1F4C1}"; // folder
-  if (node.type === "Package") return "\u{1F4E6}"; // package
-  return "\u{1F4C4}"; // file
+/** Top-level directory of a path (used for clustering + colour grouping). */
+export function topDir(path: string): string {
+  const i = path.indexOf("/");
+  return i < 0 ? "(root)" : path.slice(0, i);
 }
 
 export function nodeColor(node: MapNode): string {
@@ -35,7 +35,7 @@ export function nodeColor(node: MapNode): string {
 
 /** Node radius scales gently with import-degree (importance). */
 export function nodeSize(node: MapNode): number {
-  if (node.type === "Directory") return 6;
-  if (node.type === "Package") return 4;
-  return 3 + Math.min(14, Math.sqrt(node.degree) * 3);
+  if (node.type === "Directory") return 4;
+  if (node.type === "Package") return 3;
+  return 3 + Math.min(15, Math.sqrt(node.degree) * 3.2);
 }

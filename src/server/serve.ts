@@ -9,6 +9,7 @@ import { JsonGraphStore, type Direction, type GraphStore } from "../graph/store.
 import { DependencyIndex, nodeMetrics, type Analysis } from "../analysis/index.js";
 import { buildImpactContext, computeImpact, resolveTarget, type ImpactContext } from "../impact/index.js";
 import { diffRevisions, snapshotMapGraph, timeline, type HistoryReport } from "../git/index.js";
+import { detectWorkspaces, packageRollup } from "../scanner/workspaces.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // dist/server/serve.js -> repo root
@@ -47,6 +48,8 @@ export function serve(data: ServeData, opts: ServeOptions): Promise<string> {
   const mapJson = JSON.stringify(toMapGraph(data.codeGraph));
   const insightsJson = JSON.stringify(data.analysis);
   const historyJson = JSON.stringify(data.history ?? { isRepo: false });
+  const packageDirs = detectWorkspaces(data.root);
+  const packagesJson = JSON.stringify({ packageDirs, packages: packageRollup(data.fileGraph, packageDirs) });
   const snapshotCache = new Map<string, string>();
   const diffCache = new Map<string, string>();
 
@@ -57,10 +60,16 @@ export function serve(data: ServeData, opts: ServeOptions): Promise<string> {
       if (url === "/" || url === "/index.html") return sendFile(res, path.join(UI_DIR, "index.html"));
       if (url === "/app.js") return sendFile(res, path.join(UI_DIR, "dist", "app.js"));
       if (url === "/style.css") return sendFile(res, path.join(UI_DIR, "style.css"));
+      if (url === "/favicon.ico") {
+        // Inline diamond glyph so browsers don't log a 404 for the favicon.
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><text y="13" font-size="13">◈</text></svg>';
+        return void res.writeHead(200, { "Content-Type": "image/svg+xml" }).end(svg);
+      }
       if (url === "/graph.json") return sendJson(res, mapJson);
       if (url === "/api/insights") return sendJson(res, insightsJson);
       if (url === "/api/metrics") return handleMetrics(res, parsed.searchParams, index, data.analysis);
       if (url === "/api/impact") return handleImpact(res, parsed.searchParams, index, impactCtx);
+      if (url === "/api/packages") return sendJson(res, packagesJson);
       if (url === "/api/history") return sendJson(res, historyJson);
       if (url === "/api/timeline") return sendJson(res, JSON.stringify(data.history?.isRepo ? timeline(data.root, 30) : []));
       if (url === "/api/snapshot") return void handleSnapshot(res, parsed.searchParams, data.root, snapshotCache);

@@ -96,6 +96,36 @@ export function showFile(root: string, rev: string, path: string): string {
   return git(root, ["show", `${rev}:${path}`]);
 }
 
+/**
+ * Read many blobs at a revision in a single `git cat-file --batch` process
+ * instead of one `git show` per file — a large speedup for big trees. Returns a
+ * map of path → contents (missing/binary-unreadable paths are simply absent).
+ */
+export function readBlobs(root: string, rev: string, paths: string[]): Map<string, string> {
+  const result = new Map<string, string>();
+  if (!paths.length) return result;
+  const input = paths.map((p) => `${rev}:${p}`).join("\n") + "\n";
+  // No `encoding` → execFileSync returns a Buffer (contents may be binary).
+  const out = execFileSync("git", ["-C", root, "cat-file", "--batch"], {
+    input,
+    maxBuffer: 1 << 30,
+  });
+
+  let pos = 0;
+  const NL = 0x0a;
+  for (const p of paths) {
+    const nl = out.indexOf(NL, pos);
+    if (nl < 0) break;
+    const header = out.subarray(pos, nl).toString("utf8");
+    if (header.endsWith(" missing")) { pos = nl + 1; continue; }
+    const size = Number(header.split(" ")[2]);
+    if (!Number.isFinite(size)) break;
+    result.set(p, out.subarray(nl + 1, nl + 1 + size).toString("utf8"));
+    pos = nl + 1 + size + 1; // content + trailing newline
+  }
+  return result;
+}
+
 export interface FileStat {
   path: string;
   commits: number;
