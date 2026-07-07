@@ -16,6 +16,10 @@ import type { ImpactReport } from "./impact/index.js";
 import { buildHistory, diffRevisions, timeline, snapshotFileGraph, isGitRepo } from "./git/index.js";
 import type { HistoryReport, ArchitectureDiff } from "./git/index.js";
 import { runMcpServer } from "./mcp/server.js";
+import { runGovernance, governanceFails, markdownReport, htmlReport, healthReportJson } from "./governance/index.js";
+import type { GovernanceResult } from "./governance/index.js";
+import { analyzePr, resolveBase } from "./governance/pr.js";
+import type { PrAnalysis } from "./governance/pr.js";
 
 const program = new Command();
 
@@ -84,9 +88,16 @@ program
     }
 
     printArchitectureSummary(analysis);
+
+    // Governance health score (best-effort — never blocks scan output).
+    try {
+      const gov = runGovernance(fileGraph, root, { analysis, save: true });
+      printHealthScore(gov);
+    } catch { /* governance is informational only */ }
+
     console.log(`\nGraph saved to ${file}`);
     console.log(`Architecture summary saved to ${summaryFile}`);
-    console.log(`\nRun \x1b[1mcodemap insights ${root === "." ? "" : root}\x1b[0m for details, ` +
+    console.log(`\nRun \x1b[1mcodemap governance ${root === "." ? "" : root}\x1b[0m for the full rule report, ` +
       `or \x1b[1mcodemap serve\x1b[0m to explore.`);
   });
 
@@ -295,6 +306,57 @@ function section(title: string): void {
   console.log(`\n\x1b[1m${title}\x1b[0m`);
 }
 
+function printHealthScore(gov: GovernanceResult): void {
+  const h = gov.health;
+  const color = (s: number) =>
+    s >= 80 ? "\x1b[32m" : s >= 60 ? "\x1b[33m" : "\x1b[31m";
+  const reset = "\x1b[0m";
+  console.log(`\n\x1b[1mHealth Score\x1b[0m  ${color(h.overall)}${h.overall}/100  grade ${gov.grade}${reset}`);
+  console.log(`  Maintainability ${color(h.maintainability)}${h.maintainability}${reset}  Stability ${color(h.stability)}${h.stability}${reset}  Modularity ${color(h.modularity)}${h.modularity}${reset}  Coupling ${color(h.coupling)}${h.coupling}${reset}  Complexity ${color(h.complexity)}${h.complexity}${reset}`);
+}
+
+function printPrAnalysis(a: PrAnalysis): void {
+  const delta = a.healthDelta;
+  const arrow = delta > 0 ? "\x1b[32m▲" : delta < 0 ? "\x1b[31m▼" : "±";
+  const sign = delta > 0 ? "+" : "";
+  console.log(`\n\x1b[1mPR Analysis: HEAD → ${a.base}\x1b[0m`);
+  console.log(`  Health score:  ${a.baseHealth.overall} → ${a.headHealth.overall}  (${arrow}${sign}${delta}\x1b[0m)`);
+  console.log(`  Grade:         ${a.gradeBefore} → ${a.gradeAfter}`);
+  console.log(`  Blast radius:  ${a.blastRadiusIncrease > 0 ? `\x1b[31m+${a.blastRadiusIncrease}\x1b[0m` : a.blastRadiusIncrease === 0 ? "unchanged" : `\x1b[32m${a.blastRadiusIncrease}\x1b[0m`} (total coupling delta)`);
+  console.log(`  Changed files: ${a.addedFiles.length} added, ${a.removedFiles.length} removed, ${a.changedFiles.length} modified`);
+
+  if (a.newCycles.length) {
+    console.log(`\n\x1b[31m  ✗ ${a.newCycles.length} new cycle(s) introduced:\x1b[0m`);
+    for (const c of a.newCycles.slice(0, 6)) console.log(`    ${c.join(" → ")}`);
+  }
+  if (a.resolvedCycles.length) console.log(`\n  \x1b[32m✓ ${a.resolvedCycles.length} cycle(s) resolved\x1b[0m`);
+
+  if (a.newViolations.length) {
+    console.log(`\n\x1b[31m  ✗ ${a.newViolations.length} new violation(s):\x1b[0m`);
+    for (const v of a.newViolations.slice(0, 10)) console.log(`    [${v.rule}] ${v.file ?? ""} — ${v.detail}`);
+  }
+  if (a.resolvedViolations.length) console.log(`  \x1b[32m✓ ${a.resolvedViolations.length} violation(s) resolved\x1b[0m`);
+
+  if (a.newHotspots.length) {
+    console.log(`\n\x1b[33m  ⚠ ${a.newHotspots.length} new hotspot(s):\x1b[0m`);
+    for (const h of a.newHotspots.slice(0, 8)) console.log(`    ${h}`);
+  }
+
+  if (a.newDependencies.length) {
+    section("New dependencies introduced");
+    for (const d of a.newDependencies.slice(0, 12)) console.log(`  + ${d.from} → ${d.to}`);
+    if (a.newDependencies.length > 12) console.log(`  …and ${a.newDependencies.length - 12} more`);
+  }
+
+  if (a.couplingIncreased.length) {
+    section("Coupling increased");
+    for (const c of a.couplingIncreased.slice(0, 8)) console.log(`  ▲ ${c.path}  ${c.before} → ${c.after}`);
+  }
+
+  console.log(`\n  ${a.passes ? "\x1b[32m✓ Governance passes\x1b[0m" : "\x1b[31m✗ Governance fails\x1b[0m"}`);
+  console.log("");
+}
+
 function saveArchitectureSummary(root: string, analysis: Analysis): string {
   const dir = path.join(path.resolve(root), ".codemap");
   fs.mkdirSync(dir, { recursive: true });
@@ -380,6 +442,127 @@ function printArchitectureSummary(a: Analysis): void {
   console.log(`  • ${n(s.layerViolations)} layer violations`);
   console.log(`  • Most central module: ${s.mostCentral ?? "—"}`);
 }
+
+program
+  .command("governance")
+  .description("Run architecture governance: rule engine, health score, violations, trend")
+  .argument("[path]", "repository root", ".")
+  .option("--json", "print governance result as JSON")
+  .option("--fail-on <level>", "override fail level: error | warning | none")
+  .action(async (root: string, opts: { json?: boolean; failOn?: string }) => {
+    const graph = await buildGraph(root, { cache: true });
+    const gov = runGovernance(graph, root, { save: true });
+    if (opts.failOn) (gov as any).failOn = opts.failOn;
+
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(gov, null, 2) + "\n");
+    } else {
+      printHealthScore(gov);
+      section("Violations");
+      if (!gov.violations.length) {
+        console.log("  No violations ✓");
+      } else {
+        const errors = gov.violations.filter((v) => v.severity === "error");
+        const warnings = gov.violations.filter((v) => v.severity === "warning");
+        if (errors.length) {
+          console.log(`  \x1b[31m✗ ${errors.length} error(s)\x1b[0m`);
+          for (const v of errors.slice(0, 20)) console.log(`    [${v.rule}] ${v.file ?? ""} — ${v.detail}`);
+          if (errors.length > 20) console.log(`    …and ${errors.length - 20} more`);
+        }
+        if (warnings.length) {
+          console.log(`  \x1b[33m⚠ ${warnings.length} warning(s)\x1b[0m`);
+          for (const v of warnings.slice(0, 20)) console.log(`    [${v.rule}] ${v.file ?? ""} — ${v.detail}`);
+          if (warnings.length > 20) console.log(`    …and ${warnings.length - 20} more`);
+        }
+      }
+
+      const t = gov.trend;
+      if (t.direction !== "first-scan") {
+        section("Trend");
+        const arrow = (n: number) => (n > 0 ? `\x1b[32m▲ +${n}\x1b[0m` : n < 0 ? `\x1b[31m▼ ${n}\x1b[0m` : "±0");
+        console.log(`  Direction:   ${t.direction}`);
+        console.log(`  Health:      ${arrow(t.healthDelta)}`);
+        console.log(`  Cycles:      ${arrow(t.cyclesDelta)}`);
+        console.log(`  Coupling:    ${arrow(t.couplingDelta)}`);
+        console.log(`  God modules: ${arrow(t.godModulesDelta)}`);
+      }
+      console.log("");
+    }
+
+    if (governanceFails(gov)) {
+      console.error(`\x1b[31m✗ Governance check failed (${gov.violationCounts.error} errors, ${gov.violationCounts.warning} warnings)\x1b[0m`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("analyze-pr")
+  .description("Analyse architectural impact of the current branch vs a base branch")
+  .argument("[path]", "repository root", ".")
+  .option("--base <branch>", "base branch or commit to compare against (default: auto-detected)")
+  .option("--json", "print the analysis as JSON")
+  .option("--fail-on-violations", "exit non-zero if new violations are introduced")
+  .action(async (root: string, opts: { base?: string; json?: boolean; failOnViolations?: boolean }) => {
+    const { isGitRepo } = await import("./git/index.js");
+    if (!isGitRepo(root)) return void console.error("Not a git repository.");
+
+    const base = resolveBase(root, opts.base);
+    process.stderr.write(`\x1b[2mComparing HEAD → ${base}…\x1b[0m\n`);
+
+    const analysis = await analyzePr(root, { base });
+
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(analysis, null, 2) + "\n");
+      return;
+    }
+
+    printPrAnalysis(analysis);
+
+    if (opts.failOnViolations && analysis.newViolations.length) {
+      console.error(`\x1b[31m✗ ${analysis.newViolations.length} new architecture violation(s) introduced\x1b[0m`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("report")
+  .description("Generate architecture reports: HTML, Markdown, and JSON health report")
+  .argument("[path]", "repository root", ".")
+  .option("--out <dir>", "output directory", ".codemap")
+  .option("--md", "write Markdown report only")
+  .option("--html", "write HTML report only")
+  .option("--json", "write JSON health report only")
+  .action(async (root: string, opts: { out: string; md?: boolean; html?: boolean; json?: boolean }) => {
+    const graph = await buildGraph(root, { cache: true });
+    const gov = runGovernance(graph, root, { save: true });
+
+    const outDir = path.isAbsolute(opts.out) ? opts.out : path.join(path.resolve(root), opts.out);
+    fs.mkdirSync(outDir, { recursive: true });
+
+    const all = !opts.md && !opts.html && !opts.json;
+    const files: string[] = [];
+
+    if (all || opts.html) {
+      const file = path.join(outDir, "architecture-report.html");
+      fs.writeFileSync(file, htmlReport(gov), "utf8");
+      files.push(file);
+    }
+    if (all || opts.md) {
+      const file = path.join(outDir, "architecture-report.md");
+      fs.writeFileSync(file, markdownReport(gov), "utf8");
+      files.push(file);
+    }
+    if (all || opts.json) {
+      const file = path.join(outDir, "health-report.json");
+      fs.writeFileSync(file, healthReportJson(gov), "utf8");
+      files.push(file);
+    }
+
+    console.log(`\n\x1b[1mReports generated\x1b[0m`);
+    for (const f of files) console.log(`  ${f}`);
+    printHealthScore(gov);
+    console.log("");
+  });
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err instanceof Error ? err.message : err);

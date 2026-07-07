@@ -48,6 +48,22 @@ export function listCommits(root: string, opts: { max?: number; range?: string }
     });
 }
 
+/** Commits that touched a specific file (follows renames). */
+export function fileCommits(root: string, filePath: string, max = 30): Commit[] {
+  const fmt = ["%H", "%h", "%an", "%ae", "%aI", "%s"].join(SEP);
+  try {
+    return git(root, ["log", "--follow", `--max-count=${max}`, `--pretty=${fmt}`, "--", filePath])
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, shortHash, author, email, dateIso, subject] = line.split(SEP);
+        return { hash, shortHash, author, email, dateIso, subject };
+      });
+  } catch {
+    return [];
+  }
+}
+
 export function getBranches(root: string): string[] {
   try {
     return git(root, ["branch", "--format=%(refname:short)"]).split("\n").map((s) => s.trim()).filter(Boolean);

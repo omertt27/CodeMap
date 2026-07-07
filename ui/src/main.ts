@@ -8,6 +8,8 @@ import { Filters } from "./components/filters.js";
 import { Minimap } from "./components/minimap.js";
 import { Insights } from "./components/insights.js";
 import { History } from "./components/history.js";
+import { AgentBridge } from "./components/agentBridge.js";
+import { Governance } from "./components/governance.js";
 import type { Insights as InsightsData } from "./model/types.js";
 
 // Composition root: fetch data, construct the decoupled pieces, wire them to the
@@ -45,13 +47,16 @@ async function main(): Promise<void> {
   );
   new Filters(document.getElementById("filters")!, store, model);
   new Insights(document.getElementById("insights")!, store, model, camera);
+  const gov = new Governance(document.getElementById("governance")!);
+  gov.setFocusHandler((id) => { store.set({ selectedId: id, highlight: null }); camera.focus(id); });
   const minimap = new Minimap(document.getElementById("minimap") as HTMLCanvasElement, renderer, camera);
   new History(document.getElementById("history")!, store, renderer, camera, minimap);
+  new AgentBridge(store, model, camera); // agent → map highlight bridge (SSE)
 
   // Fit + refresh the minimap each time the animated layout settles.
   renderer.onLayoutSettled = () => { minimap.redraw(); camera.fit(); };
 
-  wireTabs(["filters", "insights", "history"]);
+  wireTabs(["filters", "insights", "governance", "history"]);
 
   // Toolbar.
   bind("fit", () => camera.fit());

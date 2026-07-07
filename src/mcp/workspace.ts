@@ -24,6 +24,8 @@ export interface Built {
 export class Workspace {
   private built: Promise<Built> | null = null;
   private history: Promise<HistoryReport> | null = null;
+  /** Per-session query cache (symbol lookups, traversals, paths, blast radius). */
+  private queryCache = new Map<string, unknown>();
 
   constructor(public readonly root: string) {}
 
@@ -36,7 +38,16 @@ export class Workspace {
   rescan(): Promise<Built> {
     this.built = this.build();
     this.history = null;
+    this.queryCache.clear(); // repository changed → drop cached query results
     return this.built;
+  }
+
+  /** Memoize a deterministic query result for the session (see `rescan`). */
+  cached<T>(key: string, compute: () => T): T {
+    if (this.queryCache.has(key)) return this.queryCache.get(key) as T;
+    const v = compute();
+    this.queryCache.set(key, v);
+    return v;
   }
 
   /** Git evolution report (cached); empty when the root is not a git repo. */

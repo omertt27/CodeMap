@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "maxDependencyDepth": 10,
+    "maxFunctionCount": 40,
+    "maxImports": 25,
+    "maxFanIn": 30,
+    "maxCoupling": 45,
+    "maxFileSize": 500,
+    "allowCircularDependencies": false
+  },
+  "forbiddenImports": [
+    {
+      "from": "src/ui/**",
+      "to": "src/scanner/**",
+      "message": "UI layer must not import scanner (build-time) internals."
+    },
+    {
+      "from": "src/analysis/**",
+      "to": "src/server/**",
+      "message": "Analysis layer must not depend on the HTTP server layer."
+    }
+  ],
+  "failOn": "error"
+}

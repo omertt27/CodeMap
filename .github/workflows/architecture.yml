@@ -1,0 +1,62 @@
+name: Architecture Governance
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  architecture:
+    name: Architecture check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch the full history so codemap can read git blame, churn, and
+          # the base branch for PR analysis without a shallow-clone warning.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # ── Scan ────────────────────────────────────────────────────────────────
+      - name: Scan repository
+        run: node dist/cli.js scan .
+
+      # ── Governance check ────────────────────────────────────────────────────
+      # Fails the job when error-level violations exist (configurable in codemap.config.json).
+      - name: Governance check
+        run: node dist/cli.js governance . --fail-on error
+
+      # ── PR analysis ─────────────────────────────────────────────────────────
+      # Only runs on pull requests; reports new violations and health delta.
+      - name: PR analysis
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: node dist/cli.js analyze-pr . --fail-on-violations
+
+      # ── Generate reports ────────────────────────────────────────────────────
+      - name: Generate architecture reports
+        run: node dist/cli.js report . --out .codemap
+
+      # ── Upload report artifacts ──────────────────────────────────────────────
+      - name: Upload architecture reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-reports
+          path: |
+            .codemap/architecture-report.html
+            .codemap/architecture-report.md
+            .codemap/health-report.json
+          retention-days: 30

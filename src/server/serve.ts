@@ -10,6 +10,7 @@ import { DependencyIndex, nodeMetrics, type Analysis } from "../analysis/index.j
 import { buildImpactContext, computeImpact, resolveTarget, type ImpactContext } from "../impact/index.js";
 import { diffRevisions, snapshotMapGraph, timeline, type HistoryReport } from "../git/index.js";
 import { detectWorkspaces, packageRollup } from "../scanner/workspaces.js";
+import { runGovernance } from "../governance/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // dist/server/serve.js -> repo root
@@ -50,6 +51,9 @@ export function serve(data: ServeData, opts: ServeOptions): Promise<string> {
   const historyJson = JSON.stringify(data.history ?? { isRepo: false });
   const packageDirs = detectWorkspaces(data.root);
   const packagesJson = JSON.stringify({ packageDirs, packages: packageRollup(data.fileGraph, packageDirs) });
+  const governanceJson = JSON.stringify(runGovernance(data.fileGraph, data.root, { analysis: data.analysis, save: false }));
+  // SSE clients for the agent→map highlight bridge (shared workspace).
+  const sseClients = new Set<http.ServerResponse>();
   const snapshotCache = new Map<string, string>();
   const diffCache = new Map<string, string>();
 
@@ -65,8 +69,11 @@ export function serve(data: ServeData, opts: ServeOptions): Promise<string> {
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><text y="13" font-size="13">◈</text></svg>';
         return void res.writeHead(200, { "Content-Type": "image/svg+xml" }).end(svg);
       }
+      if (url === "/api/events") return handleSSE(res, sseClients);
+      if (url === "/api/highlight" && req.method === "POST") return void handleHighlight(req, res, sseClients);
       if (url === "/graph.json") return sendJson(res, mapJson);
       if (url === "/api/insights") return sendJson(res, insightsJson);
+      if (url === "/api/governance") return sendJson(res, governanceJson);
       if (url === "/api/metrics") return handleMetrics(res, parsed.searchParams, index, data.analysis);
       if (url === "/api/impact") return handleImpact(res, parsed.searchParams, index, impactCtx);
       if (url === "/api/packages") return sendJson(res, packagesJson);
@@ -172,6 +179,34 @@ async function handleDiff(res: http.ServerResponse, q: URLSearchParams, root: st
   } catch {
     res.writeHead(500, { "Content-Type": "application/json" }).end('{"error":"diff failed"}');
   }
+}
+
+/** Server-Sent Events stream the UI subscribes to for agent-driven highlights. */
+function handleSSE(res: http.ServerResponse, clients: Set<http.ServerResponse>): void {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+  res.write(":ok\n\n");
+  clients.add(res);
+  res.on("close", () => clients.delete(res));
+}
+
+/** An MCP tool (or anything) POSTs a highlight command here; broadcast to all UIs. */
+function handleHighlight(req: http.IncomingMessage, res: http.ServerResponse, clients: Set<http.ServerResponse>): void {
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 1 << 20) req.destroy(); });
+  req.on("end", () => {
+    try {
+      const payload = JSON.parse(body || "{}");
+      const frame = `data: ${JSON.stringify(payload)}\n\n`;
+      for (const c of clients) c.write(frame);
+      res.writeHead(204).end();
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" }).end('{"error":"bad payload"}');
+    }
+  });
 }
 
 function sendFile(res: http.ServerResponse, file: string): void {

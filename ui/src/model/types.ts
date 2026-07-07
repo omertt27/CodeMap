@@ -104,6 +104,43 @@ export interface NodeMetricsData {
   depth: number; centrality: number; hotspotScore: number;
 }
 
+// ---- governance (/api/governance) ----
+
+export interface HealthScore {
+  overall: number; maintainability: number; stability: number;
+  modularity: number; coupling: number; complexity: number;
+  factors: {
+    files: number; edges: number; avgDegree: number; cycles: number;
+    cycleFiles: number; godModules: number; unused: number;
+    hotspotAvg: number; avgLoc: number; avgFunctions: number;
+    violations: { error: number; warning: number };
+  };
+}
+export interface HealthSnapshot {
+  timestamp: string; overall: number; maintainability: number; stability: number;
+  modularity: number; coupling: number; complexity: number;
+  cycles: number; godModules: number; hotspotAvg: number; avgDegree: number; unused: number;
+}
+export interface Trend {
+  direction: "improving" | "declining" | "stable" | "first-scan";
+  healthDelta: number; couplingDelta: number; cyclesDelta: number;
+  hotspotsDelta: number; godModulesDelta: number;
+  previous: HealthSnapshot | null; current: HealthSnapshot; history: HealthSnapshot[];
+}
+export interface RuleViolation {
+  rule: string; severity: "error" | "warning"; file?: string; detail: string;
+}
+export interface GovernanceData {
+  root: string; generatedAt: string; grade: string;
+  health: HealthScore;
+  violations: RuleViolation[];
+  violationCounts: { error: number; warning: number };
+  criticalViolations: RuleViolation[];
+  topHotspots: { id: string; path: string; score: number; reasons: string[] }[];
+  trend: Trend;
+  failOn: string;
+}
+
 /** Lazy per-file detail from /api/file (the parser's file-level record). */
 export interface FileDetail {
   id: string;
