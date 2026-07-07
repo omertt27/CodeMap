@@ -1,5 +1,7 @@
 # CodeMap
 
+<img src="docs/logo.svg" alt="CodeMap — Google Maps for codebases" width="420"/>
+
 **Google Maps for codebases.** Point CodeMap at any repository and get an interactive architecture map — files, folders, imports, exports, functions, classes, and the dependency graph that connects them. Local-first: everything runs on your machine, nothing leaves it.
 
 Supports **Python, JavaScript, TypeScript, and Java** today, via a small language-plugin system.

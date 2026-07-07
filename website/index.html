@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeMap — Google Maps for Codebases</title>
+  <meta name="description" content="Local-first interactive architecture maps, dependency analysis, impact analysis, architecture governance, and git time machine for your codebase.">
+  
+  <!-- OpenGraph -->
+  <meta property="og:title" content="CodeMap — Google Maps for Codebases">
+  <meta property="og:description" content="Get an interactive, GPU-accelerated architecture map of your repository. local-first, fast, and CI-ready.">
+  <meta property="og:image" content="assets/hero.png">
+  <meta property="og:type" content="website">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg">
+</head>
+<body>
+
+  <!-- Background Ambient Glows -->
+  <div class="glow-bg glow-purple"></div>
+  <div class="glow-bg glow-blue"></div>
+
+  <!-- Header / Navigation -->
+  <header>
+    <div class="nav-container">
+      <a href="#" class="logo">
+        <img src="assets/logo.svg" alt="CodeMap Logo" class="logo-img">
+      </a>
+      <nav>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#terminal-section">CLI Demo</a></li>
+          <li><a href="#interactive-demo">Interactive Map</a></li>
+          <li><a href="#governance">Governance</a></li>
+          <li><a href="#mcp">MCP Server</a></li>
+          <li><a href="#setup">Get Started</a></li>
+        </ul>
+      </nav>
+      <div class="nav-actions">
+        <a href="https://github.com/omertt27/CodeMap" target="_blank" class="btn btn-secondary btn-icon">
+          <svg class="icon-github" viewBox="0 0 24 24" width="20" height="20">
+            <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+      <button class="mobile-nav-toggle" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="badge-pill">Local-First Architecture Guardian</div>
+        <h1>Google Maps for your <span class="gradient-text">Codebase</span></h1>
+        <p class="hero-subtitle">
+          Point CodeMap at any repository and get an interactive architecture map. Visualize files, imports, functions, and classes. Enforce design boundaries, calculate impact scores, and query with AI agents—completely offline.
+        </p>
+        
+        <div class="cli-installer-box">
+          <code id="npm-install-text">npm install -g @omertt27/codemap</code>
+          <button class="copy-btn" id="copy-install-btn" title="Copy to clipboard">
+            <svg class="icon-copy" viewBox="0 0 24 24" width="16" height="16">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span class="copy-status">Copy</span>
+          </button>
+        </div>
+
+        <div class="hero-ctas">
+          <a href="#interactive-demo" class="btn btn-primary">Try Interactive Map</a>
+          <a href="#setup" class="btn btn-secondary">Get Started</a>
+        </div>
+
+        <div class="language-support">
+          <span>Supports:</span>
+          <span class="lang-tag"><span class="lang-dot python"></span> Python</span>
+          <span class="lang-tag"><span class="lang-dot ts"></span> TypeScript</span>
+          <span class="lang-tag"><span class="lang-dot js"></span> JavaScript</span>
+          <span class="lang-tag"><span class="lang-dot java"></span> Java</span>
+        </div>
+      </div>
+      
+      <div class="hero-visual">
+        <div class="visual-wrapper">
+          <div class="glow-overlay"></div>
+          <img src="assets/hero.png" alt="CodeMap Interactive Workspace Preview" class="hero-img">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section id="features" class="features-section">
+    <div class="section-header">
+      <h2>Architectural clarity at your fingertips</h2>
+      <p>CodeMap combines fast static parsing with graph intelligence to help you map, monitor, and guard your system design.</p>
+    </div>
+    
+    <div class="features-grid">
+      <!-- Feature 1: Local-first -->
+      <div class="feature-card">
+        <div class="feature-icon icon-local">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <h3>100% Local &amp; Private</h3>
+        <p>No code leaves your machine. Tree-sitter runs as WebAssembly; graphs and caches reside locally in SQLite. Private by design.</p>
+      </div>
+
+      <!-- Feature 2: GPU Rendered Map -->
+      <div class="feature-card">
+        <div class="feature-icon icon-gpu">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+          </svg>
+        </div>
+        <h3>GPU-Accelerated Maps</h3>
+        <p>Sigma.js &amp; WebGL-powered navigation remains fluid into thousands of nodes. Zoom, search, filter, and trace connections smoothly.</p>
+      </div>
+
+      <!-- Feature 3: Architecture Governance -->
+      <div class="feature-card">
+        <div class="feature-icon icon-gov">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+        </div>
+        <h3>CI Architecture Governance</h3>
+        <p>Run deterministic checks on dependency depth, cycles, and custom forbidden imports. Exits non-zero to protect your main branch.</p>
+      </div>
+
+      <!-- Feature 4: Blast Radius -->
+      <div class="feature-card">
+        <div class="feature-icon icon-impact">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="6"></circle>
+            <circle cx="12" cy="12" r="2"></circle>
+          </svg>
+        </div>
+        <h3>Blast Radius Analysis</h3>
+        <p>Understand coupling before refactoring. Backwards-BFS lists affected modules, downstream components, and associated test files.</p>
+      </div>
+
+      <!-- Feature 5: Git Time Machine -->
+      <div class="feature-card">
+        <div class="feature-icon icon-git">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <h3>Git Time Machine</h3>
+        <p>Trace repo evolution directly from git blobs. Visualize code churn heatmaps, stability scores, and architecture diffs over revisions.</p>
+      </div>
+
+      <!-- Feature 6: MCP Server -->
+      <div class="feature-card">
+        <div class="feature-icon icon-mcp">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <polygon points="12 2 2 7 12 12 22 7 12 2 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <h3>20+ AI Agent Tools</h3>
+        <p>Expose a Model Context Protocol (MCP) server so your AI agent (like Claude Code) can search imports, locate violations, and explore graphs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLI Simulator Section -->
+  <section id="terminal-section" class="terminal-section">
+    <div class="terminal-container">
+      <div class="terminal-info">
+        <div class="badge-pill">Developer Experience</div>
+        <h2>One command to launch</h2>
+        <p>
+          Getting started is as simple as running a command. CodeMap scans your codebase in seconds, compiles language ASTs, resolves your imports, and spins up a local server.
+        </p>
+        
+        <ul class="cmd-features-list">
+          <li><strong>No Compilation:</strong> Uses precompiled tree-sitter WebAssembly targets.</li>
+          <li><strong>Content Hashing:</strong> Incremental scanning only parses files that changed.</li>
+          <li><strong>Multi-threaded:</strong> Parses across worker threads on multi-core systems.</li>
+        </ul>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-run-scan-sim">Simulate `codemap scan`</button>
+          <button class="btn btn-secondary" id="btn-run-serve-sim">Simulate `codemap serve`</button>
+        </div>
+      </div>
+      
+      <div class="terminal-window">
+        <div class="terminal-header">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">bash — codemap</span>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+          <span class="term-prompt">~</span> <span class="term-command-text">codemap serve .</span>
+          <div class="term-line output-line text-muted">Scanning repository in root folder...</div>
+          <div class="term-line output-line text-info">✔ Discovered 453 files in workspace</div>
+          <div class="term-line output-line text-success">✔ Read incremental cache (412 files matched hashes)</div>
+          <div class="term-line output-line text-success">✔ Parsed 41 modified files on 4 worker threads [0.24s]</div>
+          <div class="term-line output-line text-info">✔ Built module dependency graph (538 nodes, 1,204 edges)</div>
+          <div class="term-line output-line">✔ Target: <span class="text-cyan">sqlite-in-memory</span> storage initialized</div>
+          <div class="term-line output-line">✔ Tarjan SCC analyzer: 0 circular dependencies detected</div>
+          <div class="term-line output-line">✔ Calculated health score: <span class="text-success">92/100 (Grade A)</span></div>
+          <div class="term-line output-line"></div>
+          <div class="term-line output-line text-yellow">Starting local server at http://127.0.0.1:4321 ...</div>
+          <div class="term-line output-line text-success">✔ Server active. Opening system browser. Press Ctrl+C to stop.</div>
+          <div class="term-line prompt-line"><span class="term-prompt">~</span> <span class="cursor"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Map Demo -->
+  <section id="interactive-demo" class="interactive-demo-section">
+    <div class="section-header">
+      <h2>Interactive Sandbox</h2>
+      <p>Explore a mock graph of CodeMap's own codebase. Hover over nodes to see connections, drag them to rearrange, or click to inspect imports, dependents, and blast radius scores.</p>
+    </div>
+
+    <div class="sandbox-container">
+      <!-- Sidebar Inspector -->
+      <div class="sandbox-inspector">
+        <div class="inspector-header">
+          <span id="inspect-icon" class="badge-lang ts">TS</span>
+          <h3 id="inspect-filename">src/auth/session.ts</h3>
+        </div>
+        <div class="inspector-body">
+          <div class="meta-row">
+            <span class="meta-label">Path</span>
+            <span class="meta-value" id="inspect-path">src/auth/session.ts</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Lines of Code</span>
+            <span class="meta-value" id="inspect-loc">184 lines</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Type</span>
+            <span class="meta-value" id="inspect-type">File</span>
+          </div>
+          
+          <div class="inspector-divider"></div>
+          
+          <div class="graph-metrics">
+            <div class="metric-card">
+              <span class="metric-num" id="inspect-imports">4</span>
+              <span class="metric-lbl">Imports (Fan-out)</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-num" id="inspect-dependents">12</span>
+              <span class="metric-lbl">Dependents (Fan-in)</span>
+            </div>
+            <div class="metric-card highlight-metric">
+              <span class="metric-num" id="inspect-impact">42</span>
+              <span class="metric-lbl">Blast Radius</span>
+            </div>
+          </div>
+
+          <div class="inspector-divider"></div>
+
+          <div class="inspector-section">
+            <h4>Direct Imports (Dependencies)</h4>
+            <ul class="symbol-list" id="inspect-imports-list">
+              <li><span class="list-dot bg-blue"></span> src/db/client.ts</li>
+              <li><span class="list-dot bg-blue"></span> src/util/crypto.ts</li>
+              <li><span class="list-dot bg-purple"></span> external: jsonwebtoken</li>
+            </ul>
+          </div>
+
+          <div class="inspector-section">
+            <h4>Exported Symbols</h4>
+            <ul class="symbol-list text-muted" id="inspect-exports-list">
+              <li>🛡 Class: <span class="text-white">SessionManager</span></li>
+              <li>⚡ Function: <span class="text-white">createSession</span></li>
+              <li>⚡ Function: <span class="text-white">verifySession</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graph Display Area -->
+      <div class="sandbox-viewport">
+        <canvas id="mini-graph-canvas"></canvas>
+        <div class="viewport-controls">
+          <button id="btn-reset-zoom" title="Reset View">Reset</button>
+          <button id="btn-toggle-labels" title="Toggle node labels">Labels On</button>
+          <button id="btn-blast-radius" title="Toggle Blast Radius Highlight">Show Impact</button>
+        </div>
+        <div class="viewport-legend">
+          <span class="legend-item"><span class="legend-dot orange"></span> Entry Point</span>
+          <span class="legend-item"><span class="legend-dot blue"></span> TS/JS File</span>
+          <span class="legend-item"><span class="legend-dot yellow"></span> Python</span>
+          <span class="legend-item"><span class="legend-dot green"></span> Database</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Governance Section -->
+  <section id="governance" class="governance-section">
+    <div class="governance-container">
+      <div class="governance-visual">
+        <div class="gov-dashboard-card">
+          <div class="gov-card-header">
+            <h3>Architecture Governance</h3>
+            <span class="gov-badge-green">Pass</span>
+          </div>
+          
+          <div class="gov-score-ring-container">
+            <svg class="score-ring" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+              <circle class="ring-fg" id="gov-ring-fg" cx="60" cy="60" r="50"></circle>
+            </svg>
+            <div class="score-center">
+              <span class="score-num" id="gov-score-num">88</span>
+              <span class="score-grade" id="gov-score-grade">A-</span>
+            </div>
+          </div>
+
+          <div class="gov-sliders">
+            <div class="slider-row">
+              <span class="slider-label">Maintainability</span>
+              <div class="slider-track"><div class="slider-fill bg-success" style="width: 90%;"></div></div>
+              <span class="slider-val">90</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-label">Stability</span>
+              <div class="slider-track"><div class="slider-fill bg-info" style="width: 82%;"></div></div>
+              <span class="slider-val">82</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-label">Modularity</span>
+              <div class="slider-track"><div class="slider-fill bg-success" style="width: 95%;"></div></div>
+              <span class="slider-val">95</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-label">Coupling Limit</span>
+              <div class="slider-track"><div class="slider-fill bg-warning" style="width: 65%;"></div></div>
+              <span class="slider-val">65</span>
+            </div>
+          </div>
+          
+          <div class="governance-violations-panel">
+            <div class="panel-heading">Active Violations (1)</div>
+            <div class="violation-item warn">
+              <span class="v-icon">⚠</span>
+              <div class="v-content">
+                <div class="v-title">Layer Violation: src/db/client.ts → src/ui/button.tsx</div>
+                <div class="v-desc">Database adapter importing UI elements directly.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="governance-text">
+        <div class="badge-pill">Governance &amp; Rules</div>
+        <h2>Maintain codebase health automatically</h2>
+        <p>
+          Don't let codebase structure decay. CodeMap acts as an automated guardian by evaluating your architecture map against custom boundary rules during development and CI.
+        </p>
+
+        <div class="governance-features">
+          <div class="gov-feat">
+            <h4>Flexible configuration (`codemap.config.json`)</h4>
+            <p>Define rules for max dependency depth, class size, function count, fan-in/fan-out coupling, and circular dependencies.</p>
+          </div>
+          <div class="gov-feat">
+            <h4>Layer Boundaries</h4>
+            <p>Declare glob-based boundaries. Enforce that backend models cannot import UI components, or that shared utils cannot import features.</p>
+          </div>
+          <div class="gov-feat">
+            <h4>Pull Request Differential Analysis</h4>
+            <p>Compare branches to show health grade change, new dependencies, blast radius shifts, and newly introduced cycles inside your PR description.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MCP Server Section -->
+  <section id="mcp" class="mcp-section">
+    <div class="mcp-container">
+      <div class="mcp-text">
+        <div class="badge-pill">AI Agent-Ready</div>
+        <h2>Give your AI coding agents a navigation map</h2>
+        <p>
+          AI agents spend precious tokens running recursive grep loops and cat-ing files to understand code flow. CodeMap solves this by exposing an MCP (Model Context Protocol) server.
+        </p>
+        <p>
+          Equip tools like <strong>Claude Code</strong>, <strong>Cursor</strong>, or <strong>Windsurf</strong> with CodeMap's 20 structured tools to query dependency paths, look up blast radius, analyze history, and build optimized context windows.
+        </p>
+
+        <div class="mcp-code-block">
+          <div class="code-title">Claude Code MCP command</div>
+          <pre><code>claude mcp add codemap -- node /dist/cli.js mcp /path/to/repo</code></pre>
+        </div>
+      </div>
+
+      <div class="mcp-visual">
+        <div class="agent-interaction-card">
+          <div class="agent-chat-bubble user">
+            <span class="avatar">U</span>
+            <div class="bubble-text">What breaks if I change <code>src/db/client.ts</code>?</div>
+          </div>
+          <div class="agent-chat-bubble agent">
+            <span class="avatar bg-purple">AI</span>
+            <div class="bubble-text">
+              <div class="agent-thinking">Running CodeMap tool: <code>impact_analysis(file: "src/db/client.ts")</code>...</div>
+              <div class="tool-result">
+                <strong>Blast Radius:</strong> High (85/100)<br>
+                <strong>Downstream affected:</strong> 14 files (3 entry points, 5 test files)<br>
+                <strong>Affected entry points:</strong>
+                <ul>
+                  <li><code>src/server.ts</code> (hop distance: 1)</li>
+                  <li><code>src/cli.ts</code> (hop distance: 2)</li>
+                </ul>
+                <strong>Recommended test suites to run:</strong>
+                <code>npm test test/db.test.ts test/server.test.ts</code>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section class="how-it-works">
+    <div class="section-header">
+      <h2>How CodeMap Works</h2>
+      <p>Clean separation between directory scanning, AST parsing, graph building, and analysis.</p>
+    </div>
+
+    <div class="pipeline-container">
+      <div class="pipeline-step">
+        <div class="step-num">1</div>
+        <h4>Scan Workspace</h4>
+        <p>Respects <code>.gitignore</code> and custom config files. Fast directory walk filters out binary files, node_modules, and ignored patterns.</p>
+      </div>
+      <div class="pipeline-arrow">➔</div>
+      <div class="pipeline-step">
+        <div class="step-num">2</div>
+        <h4>WASM Parsing</h4>
+        <p>Uses tree-sitter WASM grammars to extract symbols, classes, functions, and import/export bindings in parallel worker threads.</p>
+      </div>
+      <div class="pipeline-arrow">➔</div>
+      <div class="pipeline-step">
+        <div class="step-num">3</div>
+        <h4>Build CodeGraph</h4>
+        <p>Compiles language-agnostic Intermediate Representation (IR) into a unified dependency graph with file, directory, and package scopes.</p>
+      </div>
+      <div class="pipeline-arrow">➔</div>
+      <div class="pipeline-step">
+        <div class="step-num">4</div>
+        <h4>Insight Engine</h4>
+        <p>Runs graph algorithms (Tarjan SCC, PageRank) locally to output cycles, hot spots, god modules, and layer governance results.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get Started Section -->
+  <section id="setup" class="setup-section">
+    <div class="section-header">
+      <h2>Deploy CodeMap in under a minute</h2>
+      <p>Whether you want to audit a legacy system locally or guard your code quality in CI/CD, CodeMap fits right in.</p>
+    </div>
+
+    <div class="setup-grid">
+      <div class="setup-column">
+        <h3>Local Interactive Map</h3>
+        <p>Spin up the GPU-accelerated local server to navigate and search your code map interactively.</p>
+        <pre class="code-box"><code># Install globally
+npm install -g @omertt27/codemap
+
+# Serve the map
+codemap serve /path/to/repo
+
+# Skip install and run directly
+npx @omertt27/codemap serve /path/to/repo</code></pre>
+      </div>
+
+      <div class="setup-column">
+        <h3>CI / CD Governance</h3>
+        <p>Add checking rules to your GitHub workflow or GitLab CI file. Fail builds if architectural boundaries are crossed.</p>
+        <pre class="code-box"><code># Scan & write graph.json
+codemap scan .
+
+# Enforce governance limits
+codemap governance . --fail-on error
+
+# Analyze pull request delta
+codemap analyze-pr --fail-on-violations</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="assets/logo-icon.svg" alt="CodeMap Icon" class="footer-logo">
+        <div>
+          <h4>CodeMap</h4>
+          <p>Local-First codebase architecture mapping.</p>
+        </div>
+      </div>
+      <div class="footer-links">
+        <ul>
+          <li><strong>Project</strong></li>
+          <li><a href="https://github.com/omertt27/CodeMap" target="_blank">GitHub Repository</a></li>
+          <li><a href="https://www.npmjs.com/package/@omertt27/codemap" target="_blank">NPM Package</a></li>
+          <li><a href="https://github.com/omertt27/CodeMap/blob/main/LICENSE" target="_blank">MIT License</a></li>
+        </ul>
+      </div>
+      <div class="footer-copy">
+        <p>&copy; 2026 CodeMap Project. Created by Omer Tahtaci. All rights reserved.</p>
+        <p class="offline-note">🔒 Everything runs on your machine. No code telemetry or remote collection.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
