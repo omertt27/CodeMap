@@ -1,5 +1,5 @@
 {
-  "name": "codemap",
+  "name": "@omertt27/codemap",
   "version": "0.1.0",
   "description": "Google Maps for codebases — a local-first architecture map, dependency intelligence, impact analysis, and git time machine for any repository.",
   "keywords": [
@@ -13,6 +13,9 @@
   "bin": {
     "codemap": "dist/cli.js",
     "repo-map": "dist/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",

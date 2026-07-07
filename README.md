@@ -4,6 +4,8 @@
 
 Supports **Python, JavaScript, TypeScript, and Java** today, via a small language-plugin system.
 
+📦 **[npmjs.com/package/@omertt27/codemap](https://www.npmjs.com/package/@omertt27/codemap)**
+
 ![CodeMap — interactive architecture map with dependency analysis and blast radius](docs/hero.png)
 
 ---
@@ -17,22 +19,27 @@ Supports **Python, JavaScript, TypeScript, and Java** today, via a small languag
 ## Setup
 
 ```bash
-git clone <this-repo> codemap && cd codemap
-npm install            # installs deps and builds automatically (via prepare)
+npm install -g @omertt27/codemap
 ```
 
-Then run it one of three ways:
+That's it. The `codemap` command is now available globally:
 
 ```bash
-# 1) directly
-node dist/cli.js serve /path/to/your/repo
-
-# 2) as a global command (adds `codemap` and `repo-map` to your PATH)
-npm link
 codemap serve /path/to/your/repo
+```
 
-# 3) without linking
-npx codemap serve /path/to/your/repo
+**Alternative — run without installing:**
+
+```bash
+npx @omertt27/codemap serve /path/to/your/repo
+```
+
+**Development setup (contributing):**
+
+```bash
+git clone https://github.com/omertt27/CodeMap codemap && cd codemap
+npm install   # installs deps and builds automatically (via prepare hook)
+npm link      # makes `codemap` available globally from source
 ```
 
 ## Everyday use
@@ -216,7 +223,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm install -g codemap
+      - run: npm install -g @omertt27/codemap
 
       - run: codemap scan .
       - run: codemap governance . --fail-on error
