@@ -7,7 +7,13 @@ import { execFileSync } from "node:child_process";
 const SEP = "\x1f"; // unit separator, safe inside commit messages
 
 function git(root: string, args: string[]): string {
-  return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 1 << 28 });
+  // stderr is ignored: expected failures (e.g. "not a git repository") are
+  // handled by callers, so git's raw `fatal:` lines never reach the terminal.
+  return execFileSync("git", ["-C", root, ...args], {
+    encoding: "utf8",
+    maxBuffer: 1 << 28,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
 }
 
 export function isGitRepo(root: string): boolean {

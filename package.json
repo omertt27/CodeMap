@@ -1,7 +1,11 @@
 {
   "name": "codemap",
   "version": "0.1.0",
-  "description": "Google Maps for codebases — a local-first architecture map for any repository.",
+  "description": "Google Maps for codebases — a local-first architecture map, dependency intelligence, impact analysis, and git time machine for any repository.",
+  "keywords": [
+    "code-visualization", "dependency-graph", "architecture", "static-analysis",
+    "tree-sitter", "monorepo", "impact-analysis", "codebase", "mcp", "developer-tools"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -29,6 +33,15 @@
     "verify:ui": "node scripts/verify-ui.mjs"
   },
   "license": "MIT",
+  "author": "Omer Tahtaci",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omertt27/CodeMap.git"
+  },
+  "homepage": "https://github.com/omertt27/CodeMap#readme",
+  "bugs": {
+    "url": "https://github.com/omertt27/CodeMap/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "3d-force-graph": "^1.80.0",

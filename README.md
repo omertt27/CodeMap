@@ -4,6 +4,8 @@
 
 Supports **Python, JavaScript, TypeScript, and Java** today, via a small language-plugin system.
 
+![CodeMap — interactive architecture map with dependency analysis and blast radius](docs/hero.png)
+
 ---
 
 ## Requirements
@@ -321,10 +323,14 @@ symbol derivation) and run full `buildGraph` golden tests over on-disk fixture r
 in `test/fixtures/` (TypeScript ESM, Python packages, CommonJS `require`). CI runs
 typecheck + build + tests on every push and PR.
 
-## Scope (MVP)
+## Known limitations
 
-Deliberately **not** included yet: AI/LLM features, MCP, semantic clustering, WebGPU rendering, runtime tracing, and languages beyond Python/JS/TS. The foundation — a clean graph and a stable data model — is built so those can layer on later.
+- **Languages:** Python, JavaScript, TypeScript, and Java today. Go/Rust/PHP grammars are available and easy to add; **Ruby's** prebuilt grammar is currently ABI-incompatible with the pinned tree-sitter runtime.
+- **`node:sqlite`** (used by the optional SQLite store) is an experimental Node API and prints a warning; the default pipeline uses the in-memory store.
+- **Worker-pool parsing** engages only from the built `dist/` (not the `tsx` dev loader).
+- Verified primarily on **macOS**; Windows/Linux should work (paths, browser-open, and worker URLs account for them) but are not yet CI-tested cross-platform.
+- Not included (by design, for now): AI/LLM explanations, embeddings/semantic clustering, runtime tracing, and cloud/collaboration. The deterministic foundation is built so those can layer on cleanly.
 
 ## License
 
-MIT
+[MIT](LICENSE)
