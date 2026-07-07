@@ -41,6 +41,7 @@ function projectFile(f: ParsedFile): FileNode {
     dir: path.posix.dirname(f.path) === "." ? "" : path.posix.dirname(f.path),
     lang: f.language,
     loc: f.loc,
+    size: f.size,
     imports: f.imports,
     exports: f.exports,
     functions: f.symbols.filter((s) => s.kind === "function" && !s.parent).map(info),

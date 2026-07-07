@@ -28,6 +28,56 @@ export interface MapGraph {
   languages: string[];
 }
 
+// ---- architecture analysis (/api/insights, /api/metrics) ----
+
+export interface ArchSummary {
+  files: number; edges: number; cycles: number; hotspots: number;
+  godModules: number; unused: number; layerViolations: number; mostCentral: string | null;
+}
+export interface CycleInsight {
+  id: string; files: string[]; length: number;
+  severity: "low" | "medium" | "high"; suggestedBreak: { from: string; to: string } | null;
+}
+export interface HotspotInsight {
+  id: string; path: string; score: number; reasons: string[];
+  dependents: number; dependencies: number; loc: number; exports: number;
+}
+export interface GodInsight { id: string; path: string; reasons: string[] }
+export interface UnusedInsight { id: string; path: string; reasons: string[] }
+export interface LayerViolationInsight { from: string; to: string; fromLayer: string; toLayer: string; rule: string }
+
+export interface Insights {
+  summary: ArchSummary;
+  cycles: CycleInsight[];
+  hotspots: HotspotInsight[];
+  godModules: GodInsight[];
+  unused: UnusedInsight[];
+  layerViolations: LayerViolationInsight[];
+}
+
+export interface ImpactReport {
+  target: string;
+  targetId: string;
+  blastRadiusScore: number;
+  affectedFileCount: number;
+  directDependents: number;
+  transitiveDependents: number;
+  maxHop: number;
+  inCycle: boolean;
+  affectedNodes: { id: string; hop: number; reason: string }[];
+  affectedDirectories: string[];
+  likelyAffectedTests: { id: string; via: string }[];
+  affectedEntryPoints: { id: string; kind: string }[];
+  cycles: string[][];
+}
+
+export interface NodeMetricsData {
+  inDegree: number; outDegree: number;
+  directImports: number; directDependents: number;
+  transitiveImports: number; transitiveDependents: number;
+  depth: number; centrality: number; hotspotScore: number;
+}
+
 /** Lazy per-file detail from /api/file (the parser's file-level record). */
 export interface FileDetail {
   id: string;

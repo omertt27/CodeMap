@@ -1,10 +1,14 @@
 import Graph from "graphology";
 import Sigma from "sigma";
+import { EdgeArrowProgram } from "sigma/rendering";
 import type { GraphModel } from "../model/graphModel.js";
 import type { Store } from "../state/store.js";
 import type { LayoutEngine } from "../layout/layout.js";
 import { CameraControls } from "../camera/controls.js";
 import { DIM, EDGE_CONTAINS, EDGE_IMPORT, glyph, nodeColor, nodeSize } from "./theme.js";
+
+// Hop 0 (target) → 3+ : blue source, then red → orange → amber as impact fades.
+const BLAST_COLORS = ["#58a6ff", "#ff7b72", "#f0883e", "#d29922"];
 
 // Owns the WebGL Sigma instance. Reads all interaction state from the store via
 // reducers (no graph mutation on hover/select/filter → no re-layout, no churn),
@@ -29,6 +33,8 @@ export class Renderer {
       labelGridCellSize: 90,
       labelRenderedSizeThreshold: 8,
       defaultEdgeColor: EDGE_IMPORT,
+      defaultEdgeType: "arrow",
+      edgeProgramClasses: { arrow: EdgeArrowProgram },
       zIndex: true,
       nodeReducer: (id, data) => this.reduceNode(id, data),
       edgeReducer: (id, data) => this.reduceEdge(id, data),
@@ -37,7 +43,7 @@ export class Renderer {
 
     this.wireEvents();
     this.store.subscribe((_, changed) => {
-      if (changed.has("selectedId") || changed.has("hoveredId") || changed.has("search") || changed.has("filters")) {
+      if (["selectedId", "hoveredId", "search", "filters", "highlight", "blast"].some((k) => changed.has(k as never))) {
         this.sigma.refresh({ skipIndexation: true });
       }
     });
@@ -86,10 +92,30 @@ export class Renderer {
       res.hidden = true;
       return res;
     }
+    if (st.blast) {
+      const hop = st.blast.hops[id];
+      if (hop === undefined) { res.color = DIM; res.label = ""; }
+      else {
+        res.color = BLAST_COLORS[Math.min(hop, 3)];
+        res.zIndex = 3 - Math.min(2, hop);
+        if (hop <= 1) res.highlighted = true;
+      }
+      return res;
+    }
     const q = st.search.trim().toLowerCase();
     if (q && !(node.path.toLowerCase().includes(q) || node.name.toLowerCase().includes(q))) {
       res.color = DIM;
       res.label = "";
+    }
+    if (st.highlight) {
+      if (st.highlight.has(id)) {
+        res.highlighted = true;
+        res.zIndex = 2;
+        res.color = "#f0883e";
+      } else {
+        res.color = DIM;
+        res.label = "";
+      }
     }
     if (st.selectedId) {
       if (id === st.selectedId) {
@@ -109,6 +135,26 @@ export class Renderer {
   private reduceEdge(id: string, data: Record<string, unknown>) {
     const st = this.store.get();
     const res: Record<string, unknown> = { ...data };
+    if (st.blast) {
+      const [s, t] = this.graph.extremities(id);
+      if (st.blast.hops[s] !== undefined && st.blast.hops[t] !== undefined) {
+        res.color = "#f0883e"; res.size = 1.8; res.zIndex = 1;
+      } else {
+        res.hidden = true;
+      }
+      return res;
+    }
+    if (st.highlight) {
+      const [s, t] = this.graph.extremities(id);
+      if (st.highlight.has(s) && st.highlight.has(t)) {
+        res.color = "#f0883e";
+        res.size = 2.5;
+        res.zIndex = 1;
+      } else {
+        res.hidden = true;
+      }
+      return res;
+    }
     if (st.selectedId) {
       const [s, t] = this.graph.extremities(id);
       if (s === st.selectedId || t === st.selectedId) {
@@ -135,7 +181,7 @@ export class Renderer {
       this.store.set({ selectedId: node });
       this.camera.focus(node);
     });
-    this.sigma.on("clickStage", () => this.store.set({ selectedId: null }));
+    this.sigma.on("clickStage", () => this.store.set({ selectedId: null, highlight: null, blast: null }));
 
     this.enableDrag();
   }

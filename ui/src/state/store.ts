@@ -16,11 +16,24 @@ export interface Filters {
   minDegree: number;
 }
 
+/** Active blast-radius view: hop distance + reason for each affected node. */
+export interface BlastState {
+  targetId: string;
+  targetPath: string;
+  score: number;
+  hops: Record<string, number>; // node id → hop (0 = target)
+  reasons: Record<string, string>; // node id → why affected
+}
+
 export interface UIState {
   selectedId: string | null;
   hoveredId: string | null;
   search: string;
   filters: Filters;
+  /** A set of nodes to emphasize together (e.g. a dependency cycle). */
+  highlight: Set<string> | null;
+  /** Blast-radius overlay, or null when off. */
+  blast: BlastState | null;
 }
 
 export type Listener = (state: UIState, changed: ReadonlySet<keyof UIState>) => void;
@@ -34,6 +47,8 @@ export class Store {
       selectedId: null,
       hoveredId: null,
       search: "",
+      highlight: null,
+      blast: null,
       filters: {
         languages: null,
         types: new Set<MapNodeType>(["File", "Directory", "Package"]),

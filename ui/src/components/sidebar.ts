@@ -1,7 +1,8 @@
 import type { Store } from "../state/store.js";
 import type { GraphModel } from "../model/graphModel.js";
 import type { CameraControls } from "../camera/controls.js";
-import type { FileDetail, MapNode } from "../model/types.js";
+import type { FileDetail, ImpactReport, MapNode, NodeMetricsData } from "../model/types.js";
+import type { BlastState } from "../state/store.js";
 
 // The inspector panel. Subscribes to `selectedId`; for files it lazily fetches
 // the parser's record (/api/file) so the payload stays small. Only shows what
@@ -19,11 +20,8 @@ export class Sidebar {
     this.body = this.el.querySelector(".sidebar-body")!;
     this.el.querySelector(".close")!.addEventListener("click", () => this.store.set({ selectedId: null }));
 
-    let last: string | null = null;
-    this.store.subscribe((s) => {
-      if (s.selectedId === last) return;
-      last = s.selectedId;
-      this.render(s.selectedId);
+    this.store.subscribe((s, changed) => {
+      if (changed.has("selectedId") || changed.has("blast")) this.render(s.selectedId);
     });
   }
 
@@ -44,18 +42,67 @@ export class Sidebar {
 
     this.body.innerHTML = `<div class="loading">Loading…</div>`;
     let detail: FileDetail | null = null;
+    let metrics: NodeMetricsData | null = null;
+    let impact: ImpactReport | null = null;
     try {
-      const res = await fetch(`/api/file?id=${encodeURIComponent(id)}`);
-      if (res.ok) detail = await res.json();
+      const [fRes, mRes, iRes] = await Promise.all([
+        fetch(`/api/file?id=${encodeURIComponent(id)}`),
+        fetch(`/api/metrics?id=${encodeURIComponent(id)}`),
+        fetch(`/api/impact?id=${encodeURIComponent(id)}`),
+      ]);
+      if (fRes.ok) detail = await fRes.json();
+      if (mRes.ok) metrics = await mRes.json();
+      if (iRes.ok) impact = await iRes.json();
     } catch {
       /* offline / error → fall back to basic info */
     }
     if (my !== this.token) return; // superseded by a newer selection
-    this.body.innerHTML = detail ? this.fileView(node, detail) : this.structuralView(node);
+    this.body.innerHTML = detail
+      ? this.blastBanner(id) + this.fileView(node, detail, metrics) + this.impactSection(id, impact)
+      : this.structuralView(node);
     this.wireLinks();
+    this.wireImpact(impact);
   }
 
-  private fileView(node: MapNode, d: FileDetail): string {
+  /** Shown when the selected file is part of an active blast radius. */
+  private blastBanner(id: string): string {
+    const b = this.store.get().blast;
+    if (!b || b.targetId === id || b.hops[id] === undefined) return "";
+    return `<div class="blast-banner">Affected by <b class="mono">${esc(b.targetPath.replace(/^.*\//, ""))}</b>
+      · hop ${b.hops[id]} · <span class="muted">${esc(b.reasons[id] ?? "")}</span></div>`;
+  }
+
+  private impactSection(id: string, impact: ImpactReport | null): string {
+    if (!impact) return "";
+    const active = this.store.get().blast?.targetId === id;
+    const s = impact.blastRadiusScore;
+    return `
+      <div class="detail-block impact">
+        <h3>Impact — blast radius</h3>
+        <div class="blast-score" style="--s:${s}"><span class="num">${s}</span><span class="of">/ 100</span></div>
+        <div class="stat-row"><span>Affected files</span><span class="mono">${impact.affectedFileCount}</span></div>
+        <div class="stat-row"><span>Max hop distance</span><span class="mono">${impact.maxHop}</span></div>
+        <div class="stat-row"><span>Direct dependents</span><span class="mono">${impact.directDependents}</span></div>
+        <div class="stat-row"><span>Transitive dependents</span><span class="mono">${impact.transitiveDependents}</span></div>
+        <div class="stat-row"><span>Likely affected tests</span><span class="mono">${impact.likelyAffectedTests.length}</span></div>
+        <div class="stat-row"><span>Affected entry points</span><span class="mono">${impact.affectedEntryPoints.length}</span></div>
+        <div class="stat-row"><span>In circular dependency</span><span class="mono">${impact.inCycle ? "yes" : "no"}</span></div>
+        <button class="blast-toggle${active ? " on" : ""}" data-blast="${esc(id)}">${active ? "Hide blast radius" : "Show blast radius"}</button>
+        ${impact.affectedEntryPoints.length ? block("Affected entry points", impact.affectedEntryPoints.slice(0, 8).map((e) => `<li><span class="lnk mono" data-goto="file:${esc(e.id)}">${esc(e.id.replace(/^.*\//, ""))}</span><span class="muted"> ${esc(e.kind)}</span></li>`).join("")) : ""}
+        ${impact.likelyAffectedTests.length ? block("Likely affected tests", impact.likelyAffectedTests.slice(0, 8).map((t) => `<li><span class="lnk mono" data-goto="file:${esc(t.id)}">${esc(t.id.replace(/^.*\//, ""))}</span><span class="muted"> ${esc(t.via)}</span></li>`).join("")) : ""}
+      </div>`;
+  }
+
+  private wireImpact(impact: ImpactReport | null): void {
+    const btn = this.body.querySelector<HTMLElement>("[data-blast]");
+    if (!btn || !impact) return;
+    btn.addEventListener("click", () => {
+      const active = this.store.get().blast?.targetId === impact.targetId;
+      this.store.set({ blast: active ? null : buildBlast(impact) });
+    });
+  }
+
+  private fileView(node: MapNode, d: FileDetail, m: NodeMetricsData | null): string {
     const internal = d.imports.filter((i) => i.resolved);
     const external = d.imports.filter((i) => !i.resolved);
     return `
@@ -65,14 +112,30 @@ export class Sidebar {
         <span class="badge lang-${esc(d.lang)}">${esc(d.lang)}</span>
         <span class="badge">${d.loc} LOC</span>
         <span class="badge">${d.imports.length} deps</span>
+        ${m && m.hotspotScore > 0 ? `<span class="badge risk" style="--s:${m.hotspotScore}">risk ${m.hotspotScore}</span>` : ""}
       </div>
-      ${section("Dependencies", `${d.imports.length}`)}
+      ${m ? this.metricsBlock(m) : ""}
       ${listSection("Imports", internal.map((i) => row(i.resolved!, i.resolved!.replace(/^.*\//, ""))))}
       ${external.length ? block("External", external.map((i) => `<li class="mono muted">${esc(i.raw)}</li>`).join("")) : ""}
       ${d.exports.length ? block("Exported symbols", d.exports.map((x) => `<li class="mono">${esc(x)}</li>`).join("")) : ""}
       ${symbolBlock("Classes", d.classes)}
       ${symbolBlock("Functions", d.functions)}
     `;
+  }
+
+  private metricsBlock(m: NodeMetricsData): string {
+    const rows: [string, string | number][] = [
+      ["Direct imports", m.directImports],
+      ["Direct dependents", m.directDependents],
+      ["Transitive imports", m.transitiveImports],
+      ["Transitive dependents", m.transitiveDependents],
+      ["In / out degree", `${m.inDegree} / ${m.outDegree}`],
+      ["Dependency depth", m.depth],
+      ["Centrality", m.centrality.toFixed(4)],
+    ];
+    return `<div class="detail-block"><h3>Dependency analysis</h3>${
+      rows.map(([k, v]) => `<div class="stat-row"><span>${k}</span><span class="mono">${v}</span></div>`).join("")
+    }</div>`;
   }
 
   private structuralView(node: MapNode): string {
@@ -117,6 +180,17 @@ function block(title: string, inner: string): string {
 function section(title: string, value: string): string {
   return `<div class="stat-row"><span>${esc(title)}</span><span class="mono">${esc(value)}</span></div>`;
 }
+function buildBlast(impact: ImpactReport): BlastState {
+  const hops: Record<string, number> = { [impact.targetId]: 0 };
+  const reasons: Record<string, string> = {};
+  for (const n of impact.affectedNodes) {
+    const id = `file:${n.id}`;
+    hops[id] = n.hop;
+    reasons[id] = n.reason;
+  }
+  return { targetId: impact.targetId, targetPath: impact.target, score: impact.blastRadiusScore, hops, reasons };
+}
+
 function esc(s: string): string {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }

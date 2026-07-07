@@ -35,6 +35,7 @@ export interface FileNode {
   dir: string;
   lang: Lang;
   loc: number; // lines of code (raw line count)
+  size: number; // bytes on disk
   imports: ImportRef[];
   exports: string[]; // names this file exports
   functions: SymbolInfo[];

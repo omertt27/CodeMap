@@ -27,7 +27,12 @@
         <div class="stat"><span id="stat-edges" class="value">0</span><span class="label">edges</span></div>
       </div>
 
-      <section id="filters" class="filters"></section>
+      <div class="tabs">
+        <button class="tab active" data-tab="filters">Filters</button>
+        <button class="tab" data-tab="insights">Insights</button>
+      </div>
+      <section id="filters" class="filters pane"></section>
+      <section id="insights" class="pane" hidden></section>
 
       <footer class="hint muted">
         drag to pan · scroll to zoom · double-click a node to focus · drag a node to move it
@@ -41,6 +46,7 @@
         <button id="zoom-in" title="Zoom in">+</button>
         <button id="zoom-out" title="Zoom out">−</button>
         <button id="fit" title="Fit to screen">⤢</button>
+        <button id="cycles" title="Highlight dependency cycles">◎</button>
         <button id="relayout" title="Re-run layout">↻</button>
       </div>
 
