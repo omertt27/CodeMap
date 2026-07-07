@@ -33,6 +33,10 @@ During development you can skip the build step with `npm run dev -- <command>` (
 | `codemap summary [path]` | Print hubs, connectors, folders, external packages, and import cycles to the terminal. |
 | `codemap insights [path]` | Deterministic architecture analysis: circular deps, hotspots, possible God modules, possibly-unused files, layer violations. |
 | `codemap impact <file>` | Blast radius of changing a file — "what breaks if I change this?". Saves `.codemap/impact-report.json`. `--json`, `--root <path>`. |
+| `codemap history [path]` | Repository evolution: churn heatmap, stability scores, evolution insights. `--json`, `--max <n>`. |
+| `codemap diff <a> <b>` | Architecture diff between two revisions (added/removed/moved files, deps, cycles, hotspot & coupling shifts). `--json`. |
+| `codemap replay [path]` | Sample the timeline and report how files/dependencies grew over history. `--steps <n>`, `--json`. |
+| `codemap mcp [path]` | Run a local MCP server (stdio) exposing all analysis to AI agents. |
 | `codemap export [path]` | Write a stable, schema-versioned graph document (files + edges + symbols) for AI agents and other tools. `--stdout`, `--compact`, `-o <file>`. |
 
 ### Configuration (optional)
@@ -156,6 +160,53 @@ answers **"what breaks if I change this file?"** via reverse dependency traversa
 `codemap impact <file>` prints the report and writes `.codemap/impact-report.json`;
 the server exposes `/api/impact?id=<file:path>`.
 
+### Git Time Machine (architectural evolution)
+
+`src/git/` (a separate module — git logic is never coupled to parsing or
+rendering; pipeline `… → impact analyzer → git evolution analyzer → UI`) shows how
+the architecture changed over time.
+
+- **Historical snapshots** — the parser rebuilds the dependency graph for *any*
+  revision by reading blobs from git objects (`git show <rev>:<path>`); the working
+  directory is never touched.
+- **Code churn heatmap** — files coloured cool→hot by how often they change (Very Low → Extreme).
+- **Stability score (0–100)** — from commit frequency, author count, and churn (shown in the sidebar).
+- **Architecture diff** — added/removed/moved files, added/removed dependencies, new/resolved cycles, hotspot & coupling shifts.
+- **Evolution insights** — most changed module, fastest-growing/most-stable subsystem, newest layer, most-volatile file, modules becoming more/less coupled.
+- **History panel** — a timeline slider scrubs revisions and the map morphs (shared nodes keep their positions, new ones seed near their neighbours), a Replay button plays through history, plus a diff view.
+
+Endpoints: `/api/history`, `/api/timeline`, `/api/snapshot?rev=`, `/api/diff?a=&b=`.
+
+## MCP server (for AI agents)
+
+`codemap mcp [path]` runs a local [Model Context Protocol](https://modelcontextprotocol.io)
+server over stdio, exposing the deterministic analysis as tools an agent can call.
+**No LLM calls happen inside CodeMap** — it returns facts derived from the graph, so
+the agent reasons over reliable data. `src/mcp/` reuses the existing pipeline (a
+cached workspace per repo); it adds no analysis of its own.
+
+Tools: `scan_repo`, `search_files`, `get_file`, `get_dependencies`, `get_subgraph`,
+`architecture_insights`, `impact_analysis`, `git_history`, `git_diff`.
+
+Register it with an MCP client, e.g. Claude Code:
+
+```bash
+claude mcp add codemap -- node /abs/path/to/CodeMap/dist/cli.js mcp /abs/path/to/your/repo
+```
+
+or in an MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "codemap": { "command": "node", "args": ["/abs/path/to/CodeMap/dist/cli.js", "mcp", "/abs/path/to/your/repo"] }
+  }
+}
+```
+
+Now an agent can ask *"what breaks if I change `auth/session.ts`?"* or *"where are
+the architectural hotspots and cycles?"* and get grounded, deterministic answers.
+
 ## Project layout
 
 ```
@@ -185,7 +236,13 @@ src/
     metrics.ts config.ts index.ts
   impact/                deterministic blast-radius analyzer (reuses analysis/)
     impact.ts detect.ts index.ts
-  server/serve.ts        local UI server + query API + insights + impact
+  git/                   git evolution analyzer (never touches the working tree)
+    git.ts               git CLI wrapper (log, branches, tags, numstat)
+    snapshot.ts          parse any revision from git objects
+    history.ts diff.ts index.ts
+  mcp/                   MCP server for AI agents (reuses everything above)
+    workspace.ts server.ts
+  server/serve.ts        local UI server + query API + insights + impact + history
   util/paths.ts          small path helpers
 ui/                      the interactive map (WebGL)
   index.html style.css

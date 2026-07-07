@@ -25,6 +25,8 @@ export interface BlastState {
   reasons: Record<string, string>; // node id → why affected
 }
 
+export type Overlay = "none" | "churn";
+
 export interface UIState {
   selectedId: string | null;
   hoveredId: string | null;
@@ -34,6 +36,10 @@ export interface UIState {
   highlight: Set<string> | null;
   /** Blast-radius overlay, or null when off. */
   blast: BlastState | null;
+  /** Active node-coloring overlay (e.g. the churn heatmap). */
+  overlay: Overlay;
+  /** Which revision is on screen: "current" = live working tree, else a commit hash. */
+  revision: string;
 }
 
 export type Listener = (state: UIState, changed: ReadonlySet<keyof UIState>) => void;
@@ -49,6 +55,8 @@ export class Store {
       search: "",
       highlight: null,
       blast: null,
+      overlay: "none",
+      revision: "current",
       filters: {
         languages: null,
         types: new Set<MapNodeType>(["File", "Directory", "Package"]),

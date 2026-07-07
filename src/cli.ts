@@ -15,6 +15,7 @@ import { analyzeImpact } from "./impact/index.js";
 import type { ImpactReport } from "./impact/index.js";
 import { buildHistory, diffRevisions, timeline, snapshotFileGraph, isGitRepo } from "./git/index.js";
 import type { HistoryReport, ArchitectureDiff } from "./git/index.js";
+import { runMcpServer } from "./mcp/server.js";
 
 const program = new Command();
 
@@ -258,6 +259,15 @@ program
     console.log("  date        files  edges  commit");
     for (const s of steps) console.log(`  ${s.date}  ${String(s.files).padStart(5)}  ${String(s.edges).padStart(5)}  ${s.hash} ${s.subject.slice(0, 40)}`);
     console.log("");
+  });
+
+program
+  .command("mcp")
+  .description("Run a local MCP server exposing CodeMap analysis to AI agents (stdio transport)")
+  .argument("[path]", "repository root", ".")
+  .action(async (root: string) => {
+    // stdout is the JSON-RPC channel — never write to it here.
+    await runMcpServer(path.resolve(root));
   });
 
 program

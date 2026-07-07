@@ -18,6 +18,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "3d-force-graph": "^1.80.0",
     "commander": "^15.0.0",
     "cytoscape": "^3.34.0",
@@ -26,7 +27,8 @@
     "ignore": "^7.0.5",
     "sigma": "^3.0.3",
     "tree-sitter-wasms": "^0.1.13",
-    "web-tree-sitter": "^0.20.8"
+    "web-tree-sitter": "^0.20.8",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",

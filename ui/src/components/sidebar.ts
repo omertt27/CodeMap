@@ -3,6 +3,7 @@ import type { GraphModel } from "../model/graphModel.js";
 import type { CameraControls } from "../camera/controls.js";
 import type { FileDetail, ImpactReport, MapNode, NodeMetricsData } from "../model/types.js";
 import type { BlastState } from "../state/store.js";
+import { getHistory, churnMap, stabilityMap } from "../model/historyCache.js";
 
 // The inspector panel. Subscribes to `selectedId`; for files it lazily fetches
 // the parser's record (/api/file) so the payload stays small. Only shows what
@@ -62,6 +63,23 @@ export class Sidebar {
       : this.structuralView(node);
     this.wireLinks();
     this.wireImpact(impact);
+    if (detail) this.appendHistory(node.path, my);
+  }
+
+  /** Append git churn + stability once the (cached) history report is ready. */
+  private async appendHistory(filePath: string, my: number): Promise<void> {
+    let report;
+    try { report = await getHistory(); } catch { return; }
+    if (my !== this.token || !report.isRepo) return;
+    const churn = churnMap(report).get(filePath);
+    const stability = stabilityMap(report).get(filePath);
+    if (churn === undefined && stability === undefined) return;
+    const html = `<div class="detail-block"><h3>History</h3>
+      ${stability !== undefined ? `<div class="stat-row"><span>Stability</span><span class="mono">${stability}/100</span></div>` : ""}
+      ${churn ? `<div class="stat-row"><span>Churn</span><span class="mono">${churn.churn} lines · ${churn.level}</span></div>
+                 <div class="stat-row"><span>Commits</span><span class="mono">${churn.commits}</span></div>` : ""}
+    </div>`;
+    this.body.insertAdjacentHTML("beforeend", html);
   }
 
   /** Shown when the selected file is part of an active blast radius. */

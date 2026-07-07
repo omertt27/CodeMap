@@ -73,6 +73,27 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   color: hsl(calc(120 - var(--s) * 1.2), 70%, 62%); }
 .badge.risk { border-color: hsl(calc(120 - var(--s) * 1.2), 60%, 45%); }
 
+/* history panel */
+.hist-group { margin-bottom: 16px; }
+.hist-group h4 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.hist-group select, .hist-group input[type=range] { width: 100%; margin-bottom: 6px; }
+.hist-group select { padding: 6px 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
+.hist-group button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.hist-group button:hover { border-color: var(--accent); color: var(--accent); }
+.rev-label { color: var(--accent); font-family: ui-monospace, monospace; text-transform: none; }
+.time-controls { display: flex; gap: 6px; margin: 6px 0; }
+.time-controls button { flex: 1; }
+.commit-meta { font-size: 12px; margin-top: 8px; min-height: 16px; }
+.churn-legend { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); margin-top: 4px; }
+.churn-legend span { width: 12px; height: 8px; border-radius: 2px; background: var(--c); display: inline-block; }
+.ins-list.compact li { display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; cursor: default; }
+.diff-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin-bottom: 8px; }
+.diff-stats .add { color: #7ee787; } .diff-stats .rem { color: #ff7b72; }
+.diff-warn { color: var(--warn, #f0883e); font-size: 12px; margin-bottom: 8px; }
+.diff-block { margin: 8px 0; } .diff-block h5 { margin: 0 0 4px; font-size: 10px; text-transform: uppercase; color: var(--muted); }
+.diff-block ul { list-style: none; padding: 0; margin: 0; font-size: 11.5px; }
+.diff-block ul.add li { color: #7ee787; } .diff-block ul.rem li { color: #ff7b72; }
+
 /* ---------------- stage ---------------- */
 #canvas-wrap { position: relative; overflow: hidden;
   background:

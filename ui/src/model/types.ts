@@ -71,6 +71,32 @@ export interface ImpactReport {
   cycles: string[][];
 }
 
+// ---- git evolution (/api/history, /api/timeline, /api/snapshot, /api/diff) ----
+
+export interface Commit {
+  hash: string; shortHash: string; author: string; email: string; dateIso: string; subject: string;
+}
+export interface ChurnEntry { path: string; commits: number; churn: number; authors: number; score: number; level: string }
+export interface StabilityEntry { path: string; stability: number; commits: number; authors: number; churn: number }
+export interface EvolutionInsights {
+  mostChangedModule: string | null; fastestGrowingSubsystem: string | null; mostStableSubsystem: string | null;
+  newestArchitecturalLayer: string | null; mostVolatileDependency: string | null;
+  couplingIncreasing: { module: string; before: number; after: number }[];
+  couplingDecreasing: { module: string; before: number; after: number }[];
+}
+export interface HistoryReport {
+  isRepo: boolean; commits: Commit[]; branches: string[]; tags: string[];
+  churn: ChurnEntry[]; stability: StabilityEntry[]; evolution: EvolutionInsights;
+}
+export interface ArchitectureDiff {
+  from: string; to: string;
+  addedFiles: string[]; removedFiles: string[]; movedFiles: { from: string; to: string }[];
+  addedDependencies: { from: string; to: string }[]; removedDependencies: { from: string; to: string }[];
+  newCycles: string[][]; removedCycles: string[][];
+  hotspotChanges: { path: string; before: number; after: number; delta: number }[];
+  couplingChanges: { path: string; before: number; after: number; delta: number }[];
+}
+
 export interface NodeMetricsData {
   inDegree: number; outDegree: number;
   directImports: number; directDependents: number;

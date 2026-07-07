@@ -8,6 +8,7 @@ import { Search } from "./components/search.js";
 import { Filters } from "./components/filters.js";
 import { Minimap } from "./components/minimap.js";
 import { Insights } from "./components/insights.js";
+import { History } from "./components/history.js";
 import type { Insights as InsightsData } from "./model/types.js";
 
 // Composition root: fetch data, construct the decoupled pieces, wire them to the
@@ -39,8 +40,9 @@ async function main(): Promise<void> {
   new Filters(document.getElementById("filters")!, store, model);
   new Insights(document.getElementById("insights")!, store, model, camera);
   const minimap = new Minimap(document.getElementById("minimap") as HTMLCanvasElement, renderer, camera);
+  new History(document.getElementById("history")!, store, renderer, camera, minimap);
 
-  wireTabs();
+  wireTabs(["filters", "insights", "history"]);
 
   // Toolbar.
   bind("fit", () => camera.fit());
@@ -69,14 +71,12 @@ async function toggleCycles(store: Store): Promise<void> {
   store.set({ selectedId: null, highlight: ids.size ? ids : new Set(["__none__"]) });
 }
 
-function wireTabs(): void {
+function wireTabs(names: string[]): void {
   const tabs = document.querySelectorAll<HTMLElement>(".tab");
   tabs.forEach((tab) =>
     tab.addEventListener("click", () => {
       tabs.forEach((t) => t.classList.toggle("active", t === tab));
-      const name = tab.dataset.tab!;
-      document.getElementById("filters")!.hidden = name !== "filters";
-      document.getElementById("insights")!.hidden = name !== "insights";
+      for (const n of names) document.getElementById(n)!.hidden = tab.dataset.tab !== n;
     }),
   );
 }
