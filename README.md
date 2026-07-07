@@ -10,6 +10,8 @@ Supports **Python, JavaScript, TypeScript, and Java** today, via a small languag
 
 ![CodeMap — interactive architecture map with dependency analysis and blast radius](docs/hero.png)
 
+![CodeMap interactive map — 160 nodes, 487 edges, filters by language, type, and directory](docs/interactive-map.png)
+
 ---
 
 ## Requirements
